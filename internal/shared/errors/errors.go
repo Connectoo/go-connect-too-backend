@@ -4,4 +4,11 @@ package errors
 const (
 	CodeInternalError     = "INTERNAL_ERROR"
 	CodeHealthCheckFailed = "HEALTH_CHECK_FAILED"
+
+	CodeValidationError    = "VALIDATION_ERROR"
+	CodeUnauthorized       = "UNAUTHORIZED"
+	CodeForbidden          = "FORBIDDEN"
+	CodeConflict           = "CONFLICT"
+	CodeInvalidToken       = "INVALID_TOKEN"
+	CodeInvalidCredentials = "INVALID_CREDENTIALS"
 )

@@ -44,6 +44,38 @@ func TestHealthCheckSuccess(t *testing.T) {
 	}
 }
 
+func TestSwaggerUIDocs(t *testing.T) {
+	srv := newTestServer(t, &fakeDB{pingErr: nil})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/docs/", nil)
+	rec := httptest.NewRecorder()
+
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "text/html; charset=utf-8" {
+		t.Fatalf("Content-Type = %q, want text/html", ct)
+	}
+}
+
+func TestOpenAPISpec(t *testing.T) {
+	srv := newTestServer(t, &fakeDB{pingErr: nil})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/docs/openapi.yaml", nil)
+	rec := httptest.NewRecorder()
+
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if rec.Header().Get("Content-Type") != "application/yaml" {
+		t.Fatalf("unexpected Content-Type: %s", rec.Header().Get("Content-Type"))
+	}
+}
+
 func TestHealthCheckDatabaseDown(t *testing.T) {
 	srv := newTestServer(t, &fakeDB{pingErr: errors.New("db down")})
 
@@ -76,5 +108,5 @@ func newTestServer(t *testing.T, db Pinger) *Server {
 	}
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	return NewServer(cfg, log, db)
+	return NewServer(cfg, log, db, nil)
 }

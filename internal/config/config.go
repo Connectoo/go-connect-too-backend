@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 // Config holds application configuration loaded from environment variables.
@@ -17,10 +19,19 @@ type Config struct {
 	DBMaxOpenConns    int
 	DBMaxIdleConns    int
 	DBConnMaxLifetime time.Duration
+
+	JWTAccessSecret  string
+	JWTRefreshSecret string
+	JWTAccessTTL     time.Duration
+	JWTRefreshTTL    time.Duration
 }
 
 // Load reads configuration from the environment.
+// A .env file in the working directory is loaded when present (local dev);
+// variables already set in the process environment take precedence.
 func Load() (*Config, error) {
+	_ = godotenv.Load()
+
 	port, err := strconv.Atoi(getEnv("HTTP_PORT", "8080"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid HTTP_PORT: %w", err)
@@ -46,6 +57,26 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
 
+	accessSecret := os.Getenv("JWT_ACCESS_SECRET")
+	if accessSecret == "" {
+		return nil, fmt.Errorf("JWT_ACCESS_SECRET is required")
+	}
+
+	refreshSecret := os.Getenv("JWT_REFRESH_SECRET")
+	if refreshSecret == "" {
+		return nil, fmt.Errorf("JWT_REFRESH_SECRET is required")
+	}
+
+	accessTTLMin, err := strconv.Atoi(getEnv("JWT_ACCESS_TTL_MINUTES", "15"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid JWT_ACCESS_TTL_MINUTES: %w", err)
+	}
+
+	refreshTTLDays, err := strconv.Atoi(getEnv("JWT_REFRESH_TTL_DAYS", "7"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid JWT_REFRESH_TTL_DAYS: %w", err)
+	}
+
 	return &Config{
 		AppEnv:            getEnv("APP_ENV", "development"),
 		HTTPPort:          port,
@@ -54,6 +85,10 @@ func Load() (*Config, error) {
 		DBMaxOpenConns:    maxOpen,
 		DBMaxIdleConns:    maxIdle,
 		DBConnMaxLifetime: time.Duration(connLifetimeSec) * time.Second,
+		JWTAccessSecret:   accessSecret,
+		JWTRefreshSecret:  refreshSecret,
+		JWTAccessTTL:      time.Duration(accessTTLMin) * time.Minute,
+		JWTRefreshTTL:     time.Duration(refreshTTLDays) * 24 * time.Hour,
 	}, nil
 }
 

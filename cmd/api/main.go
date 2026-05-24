@@ -37,7 +37,7 @@ func main() {
 		}
 	}()
 
-	server := app.NewServer(cfg, log, db)
+	server := app.NewServer(cfg, log, db, db.DB)
 	if err := server.Run(ctx); err != nil {
 		log.Error("server stopped with error", slog.String("error", err.Error()))
 		os.Exit(1)

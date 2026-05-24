@@ -1,7 +1,7 @@
 package app
-
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,9 +11,12 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/MustafaKheda/go-connect-too-backend/internal/config"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/auth"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/response"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/security"
 )
 
 // Pinger checks database connectivity for health checks.
@@ -31,7 +34,7 @@ type Server struct {
 }
 
 // NewServer builds the HTTP server and route tree.
-func NewServer(cfg *config.Config, log *slog.Logger, db Pinger) *Server {
+func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *Server {
 	s := &Server{
 		cfg: cfg,
 		log: log,
@@ -44,8 +47,18 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger) *Server {
 	s.router.Use(chimiddleware.Recoverer)
 	s.router.Use(middleware.RequestLogger(log))
 
+	tokenManager := security.NewTokenManager(cfg.JWTAccessSecret, cfg.JWTAccessTTL)
+	userRepo := users.NewRepository(sqlDB)
+	authRepo := auth.NewRepository(sqlDB)
+	authSvc := auth.NewService(cfg, userRepo, authRepo, tokenManager)
+	authHandler := auth.NewHandler(authSvc)
+
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", s.healthCheck)
+		auth.RegisterRoutes(r, authHandler, tokenManager)
+		if cfg.AppEnv != "production" {
+			registerDocsRoutes(r)
+		}
 	})
 
 	s.http = &http.Server{
