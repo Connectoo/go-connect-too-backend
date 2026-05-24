@@ -47,11 +47,13 @@ Phase 1 foundation for the service marketplace modular monolith API.
    docker compose up -d
    ```
 
-3. Run migrations:
+3. Run migrations (required before auth endpoints work):
 
    ```bash
    make migrate-up
    ```
+
+   Confirm tables exist: `users`, `refresh_tokens`. If `migrate-up` fails with an empty database URL, ensure `.env` exists and `DATABASE_URL` is set (the Makefile loads `.env` automatically).
 
 4. Start the API:
 

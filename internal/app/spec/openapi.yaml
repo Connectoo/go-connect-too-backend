@@ -82,11 +82,11 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /auth/login:
+  /auth/login/customer:
     post:
       tags: [Auth]
-      summary: Login
-      operationId: login
+      summary: Customer login
+      operationId: loginCustomer
       requestBody:
         required: true
         content:
@@ -95,7 +95,34 @@ paths:
               $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
-          description: Login successful
+          description: Customer login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/InvalidCredentials"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/login/employee:
+    post:
+      tags: [Auth]
+      summary: Employee login
+      operationId: loginEmployee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Employee login successful
           content:
             application/json:
               schema:

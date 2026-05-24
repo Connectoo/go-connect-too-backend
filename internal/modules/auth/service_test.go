@@ -17,6 +17,10 @@ type mockUserStore struct {
 	byID  map[uuid.UUID]*users.User
 }
 
+func userStoreKey(email, role string) string {
+	return email + "\x00" + role
+}
+
 func newMockUserStore() *mockUserStore {
 	return &mockUserStore{
 		users: make(map[string]*users.User),
@@ -25,17 +29,18 @@ func newMockUserStore() *mockUserStore {
 }
 
 func (m *mockUserStore) Create(_ context.Context, user *users.User) error {
-	if _, ok := m.users[user.Email]; ok {
+	key := userStoreKey(user.Email, user.Role)
+	if _, ok := m.users[key]; ok {
 		return users.ErrDuplicateEmail
 	}
 	copy := *user
-	m.users[user.Email] = &copy
+	m.users[key] = &copy
 	m.byID[user.ID] = &copy
 	return nil
 }
 
-func (m *mockUserStore) GetByEmail(_ context.Context, email string) (*users.User, error) {
-	user, ok := m.users[email]
+func (m *mockUserStore) GetByEmailAndRole(_ context.Context, email, role string) (*users.User, error) {
+	user, ok := m.users[userStoreKey(email, role)]
 	if !ok {
 		return nil, users.ErrNotFound
 	}
@@ -93,10 +98,26 @@ func testConfig() *config.Config {
 	}
 }
 
+type mockRegistrar struct {
+	users *mockUserStore
+}
+
+func (m *mockRegistrar) RegisterCustomer(ctx context.Context, user *users.User) error {
+	return m.users.Create(ctx, user)
+}
+
+func (m *mockRegistrar) RegisterEmployee(ctx context.Context, user *users.User) error {
+	return m.users.Create(ctx, user)
+}
+
 func newTestService(t *testing.T, userStore UserStore, refreshStore RefreshStore) *Service {
 	t.Helper()
+	store, ok := userStore.(*mockUserStore)
+	if !ok {
+		t.Fatal("tests require *mockUserStore")
+	}
 	cfg := testConfig()
-	svc := NewService(cfg, userStore, refreshStore, security.NewTokenManager(cfg.JWTAccessSecret, cfg.JWTAccessTTL))
+	svc := NewService(cfg, userStore, &mockRegistrar{users: store}, refreshStore, security.NewTokenManager(cfg.JWTAccessSecret, cfg.JWTAccessTTL))
 	svc.now = func() time.Time {
 		return time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
 	}
@@ -119,6 +140,31 @@ func TestRegisterCustomerSuccess(t *testing.T) {
 	}
 	if res.Tokens.AccessToken == "" || res.Tokens.RefreshToken == "" {
 		t.Fatal("expected tokens")
+	}
+}
+
+func TestRegisterSameEmailDifferentRoles(t *testing.T) {
+	svc := newTestService(t, newMockUserStore(), newMockRefreshStore())
+
+	email := "shared@example.com"
+	if _, err := svc.RegisterEmployee(context.Background(), RegisterEmployeeRequest{
+		Name:     "Employee",
+		Email:    email,
+		Password: "password123",
+	}); err != nil {
+		t.Fatalf("RegisterEmployee() error = %v", err)
+	}
+
+	res, err := svc.RegisterCustomer(context.Background(), RegisterCustomerRequest{
+		Name:     "Customer",
+		Email:    email,
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("RegisterCustomer() error = %v", err)
+	}
+	if res.User == nil || res.User.Role != users.RoleCustomer {
+		t.Fatalf("unexpected user: %+v", res.User)
 	}
 }
 
@@ -154,7 +200,7 @@ func TestLoginSuccess(t *testing.T) {
 		t.Fatalf("register error = %v", err)
 	}
 
-	res, err := svc.Login(context.Background(), LoginRequest{
+	res, err := svc.LoginCustomer(context.Background(), LoginRequest{
 		Email:    "john@example.com",
 		Password: "password123",
 	})
@@ -179,7 +225,7 @@ func TestLoginWrongPassword(t *testing.T) {
 		t.Fatalf("register error = %v", err)
 	}
 
-	_, err = svc.Login(context.Background(), LoginRequest{
+	_, err = svc.LoginCustomer(context.Background(), LoginRequest{
 		Email:    "john2@example.com",
 		Password: "wrong-password",
 	})

@@ -1,4 +1,5 @@
 package app
+
 import (
 	"context"
 	"database/sql"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/MustafaKheda/go-connect-too-backend/internal/config"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/auth"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/customers"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
@@ -49,9 +52,12 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 
 	tokenManager := security.NewTokenManager(cfg.JWTAccessSecret, cfg.JWTAccessTTL)
 	userRepo := users.NewRepository(sqlDB)
+	customerRepo := customers.NewRepository(sqlDB)
+	employeeRepo := employees.NewRepository(sqlDB)
+	registrar := auth.NewRegistrar(sqlDB, userRepo, customerRepo, employeeRepo)
 	authRepo := auth.NewRepository(sqlDB)
-	authSvc := auth.NewService(cfg, userRepo, authRepo, tokenManager)
-	authHandler := auth.NewHandler(authSvc)
+	authSvc := auth.NewService(cfg, userRepo, registrar, authRepo, tokenManager)
+	authHandler := auth.NewHandler(authSvc, log)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", s.healthCheck)

@@ -1,4 +1,4 @@
-package employees
+package customers
 
 import (
 	"context"
@@ -9,25 +9,25 @@ import (
 	"github.com/google/uuid"
 )
 
-// Repository persists employee profiles.
+// Repository persists customer profiles.
 type Repository struct {
 	db *sql.DB
 }
 
-// NewRepository creates an employee repository.
+// NewRepository creates a customer repository.
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
-// CreateForUserInTx inserts a profile row for a newly registered employee user.
+// CreateForUserInTx inserts a profile row for a newly registered customer user.
 func (r *Repository) CreateForUserInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, at time.Time) error {
 	query := `
-		INSERT INTO employee_profiles (id, user_id, created_at, updated_at)
+		INSERT INTO customer_profiles (id, user_id, created_at, updated_at)
 		VALUES ($1, $2, $3, $4)`
 
 	_, err := tx.ExecContext(ctx, query, uuid.New(), userID, at, at)
 	if err != nil {
-		return fmt.Errorf("insert employee profile: %w", err)
+		return fmt.Errorf("insert customer profile: %w", err)
 	}
 	return nil
 }

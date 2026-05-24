@@ -18,7 +18,7 @@ type RegisterEmployeeRequest struct {
 	Password string  `json:"password"`
 }
 
-// LoginRequest authenticates a user.
+// LoginRequest authenticates a user (role is chosen by the login endpoint).
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`

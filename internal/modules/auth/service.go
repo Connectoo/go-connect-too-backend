@@ -20,7 +20,7 @@ import (
 // UserStore loads and creates users.
 type UserStore interface {
 	Create(ctx context.Context, user *users.User) error
-	GetByEmail(ctx context.Context, email string) (*users.User, error)
+	GetByEmailAndRole(ctx context.Context, email, role string) (*users.User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*users.User, error)
 }
 
@@ -35,6 +35,7 @@ type RefreshStore interface {
 type Service struct {
 	cfg           *config.Config
 	users         UserStore
+	registrar     AccountRegistrar
 	refresh       RefreshStore
 	tokens        *security.TokenManager
 	refreshTTL    time.Duration
@@ -43,10 +44,11 @@ type Service struct {
 }
 
 // NewService creates an auth service.
-func NewService(cfg *config.Config, userStore UserStore, refreshStore RefreshStore, tokens *security.TokenManager) *Service {
+func NewService(cfg *config.Config, userStore UserStore, registrar AccountRegistrar, refreshStore RefreshStore, tokens *security.TokenManager) *Service {
 	return &Service{
 		cfg:           cfg,
 		users:         userStore,
+		registrar:     registrar,
 		refresh:       refreshStore,
 		tokens:        tokens,
 		refreshTTL:    cfg.JWTRefreshTTL,
@@ -88,7 +90,15 @@ func (s *Service) register(ctx context.Context, name, email string, phone *strin
 		UpdatedAt:    now,
 	}
 
-	if err := s.users.Create(ctx, user); err != nil {
+	switch role {
+	case users.RoleCustomer:
+		err = s.registrar.RegisterCustomer(ctx, user)
+	case users.RoleEmployee:
+		err = s.registrar.RegisterEmployee(ctx, user)
+	default:
+		return nil, ErrValidation
+	}
+	if err != nil {
 		return nil, err
 	}
 
@@ -103,14 +113,23 @@ func (s *Service) register(ctx context.Context, name, email string, phone *strin
 	}, nil
 }
 
-// Login authenticates with email and password.
-func (s *Service) Login(ctx context.Context, req LoginRequest) (*AuthResponse, error) {
+// LoginCustomer authenticates a customer account.
+func (s *Service) LoginCustomer(ctx context.Context, req LoginRequest) (*AuthResponse, error) {
+	return s.login(ctx, req, users.RoleCustomer)
+}
+
+// LoginEmployee authenticates an employee account.
+func (s *Service) LoginEmployee(ctx context.Context, req LoginRequest) (*AuthResponse, error) {
+	return s.login(ctx, req, users.RoleEmployee)
+}
+
+func (s *Service) login(ctx context.Context, req LoginRequest, role string) (*AuthResponse, error) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	if email == "" || req.Password == "" {
 		return nil, ErrValidation
 	}
 
-	user, err := s.users.GetByEmail(ctx, email)
+	user, err := s.users.GetByEmailAndRole(ctx, email, role)
 	if err != nil {
 		if errors.Is(err, users.ErrNotFound) {
 			return nil, ErrInvalidCredentials

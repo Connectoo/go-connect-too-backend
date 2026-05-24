@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
@@ -14,11 +16,12 @@ import (
 // Handler serves auth HTTP endpoints.
 type Handler struct {
 	svc *Service
+	log *slog.Logger
 }
 
 // NewHandler creates an auth handler.
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, log *slog.Logger) *Handler {
+	return &Handler{svc: svc, log: log}
 }
 
 func (h *Handler) registerCustomer(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +33,7 @@ func (h *Handler) registerCustomer(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.RegisterCustomer(r.Context(), req)
 	if err != nil {
-		writeServiceError(w, err)
+		h.writeServiceError(w, err)
 		return
 	}
 
@@ -46,27 +49,35 @@ func (h *Handler) registerEmployee(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.RegisterEmployee(r.Context(), req)
 	if err != nil {
-		writeServiceError(w, err)
+		h.writeServiceError(w, err)
 		return
 	}
 
 	response.JSON(w, http.StatusCreated, "Employee registered", res)
 }
 
-func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) loginCustomer(w http.ResponseWriter, r *http.Request) {
+	h.login(w, r, "Customer", h.svc.LoginCustomer)
+}
+
+func (h *Handler) loginEmployee(w http.ResponseWriter, r *http.Request) {
+	h.login(w, r, "Employee", h.svc.LoginEmployee)
+}
+
+func (h *Handler) login(w http.ResponseWriter, r *http.Request, label string, fn func(context.Context, LoginRequest) (*AuthResponse, error)) {
 	var req LoginRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
 		return
 	}
 
-	res, err := h.svc.Login(r.Context(), req)
+	res, err := fn(r.Context(), req)
 	if err != nil {
-		writeServiceError(w, err)
+		h.writeServiceError(w, err)
 		return
 	}
 
-	response.JSON(w, http.StatusOK, "Login successful", res)
+	response.JSON(w, http.StatusOK, label+" login successful", res)
 }
 
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +89,7 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.Refresh(r.Context(), req.RefreshToken)
 	if err != nil {
-		writeServiceError(w, err)
+		h.writeServiceError(w, err)
 		return
 	}
 
@@ -93,7 +104,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Logout(r.Context(), req.RefreshToken); err != nil {
-		writeServiceError(w, err)
+		h.writeServiceError(w, err)
 		return
 	}
 
@@ -109,7 +120,7 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.Me(r.Context(), userID)
 	if err != nil {
-		writeServiceError(w, err)
+		h.writeServiceError(w, err)
 		return
 	}
 
@@ -122,7 +133,7 @@ func decodeJSON(r *http.Request, dst interface{}) error {
 	return dec.Decode(dst)
 }
 
-func writeServiceError(w http.ResponseWriter, err error) {
+func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, ErrValidation):
 		response.Error(w, http.StatusBadRequest, "Validation failed", sharederrors.CodeValidationError)
@@ -139,6 +150,9 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, users.ErrNotFound):
 		response.Error(w, http.StatusNotFound, "User not found", sharederrors.CodeUnauthorized)
 	default:
+		if h.log != nil {
+			h.log.Error("auth request failed", slog.String("error", err.Error()))
+		}
 		response.Error(w, http.StatusInternalServerError, "Something went wrong", sharederrors.CodeInternalError)
 	}
 }
