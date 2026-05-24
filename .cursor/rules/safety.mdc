@@ -1,0 +1,18 @@
+# Definition of Done
+
+For every code change:
+- read existing files first
+- make the smallest safe change
+- run gofmt
+- run go test ./...
+- update README or docs if setup changes
+- explain changed files
+- mention skipped tests or blockers
+
+# Git Safety
+
+Do not rewrite unrelated files.
+Do not delete files unless explicitly requested.
+Do not run destructive commands without asking.
+Do not commit secrets.
+Do not modify production database.

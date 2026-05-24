@@ -1,0 +1,59 @@
+---
+description: Go backend coding rules
+globs:
+  - "**/*.go"
+alwaysApply: false
+---
+
+# Go Backend Rules
+
+Use idiomatic Go.
+
+Use these patterns:
+- constructor functions: NewService, NewRepository, NewHandler
+- interfaces only where they improve testing or boundaries
+- small files and small functions
+- explicit error handling
+- table-driven tests
+
+Avoid:
+- global mutable state
+- huge service files
+- circular dependencies
+- unnecessary abstractions
+- generic repository pattern unless useful
+
+# Naming
+
+Use:
+- UserService
+- UserRepository
+- UserHandler
+- CreateUserRequest
+- CreateUserResponse
+
+# Error Handling
+
+Wrap internal errors using fmt.Errorf.
+
+Return domain errors from service layer.
+
+Convert errors to HTTP responses in handler layer only.
+
+# API Response Format
+
+Use this JSON format:
+
+{
+  "success": true,
+  "message": "Operation successful",
+  "data": {}
+}
+
+For errors:
+
+{
+  "success": false,
+  "message": "Human readable error",
+  "error": "ERROR_CODE"
+}

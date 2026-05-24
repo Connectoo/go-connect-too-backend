@@ -1,0 +1,27 @@
+---
+description: Testing rules for Go backend
+globs:
+  - "**/*_test.go"
+alwaysApply: false
+---
+
+# Testing Rules
+
+Use table-driven tests.
+
+Test service layer first.
+
+Mock repositories when testing services.
+
+Use test database or containers for repository tests.
+
+Every important module should have tests for:
+- success case
+- validation failure
+- unauthorized case
+- not found case
+- database error case
+
+For booking and payment modules, test state transitions carefully.
+
+Do not skip error path tests.

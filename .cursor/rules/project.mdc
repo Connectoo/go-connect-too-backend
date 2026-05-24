@@ -1,0 +1,87 @@
+---
+description: Main project rules for Go modular monolith service marketplace
+alwaysApply: true
+---
+
+# Project Context
+
+This is a Go backend for a service marketplace application.
+
+The system has:
+- Customer mobile app
+- Provider mobile app
+- Admin web dashboard
+- Public website
+- Go backend API
+- PostgreSQL database
+- WebSocket notifications
+- Push notifications
+- Payment gateway integration
+- Modular monolith architecture
+
+# Architecture Rules
+
+Use modular monolith architecture.
+
+Each business module should contain:
+- handler.go
+- service.go
+- repository.go
+- model.go
+- dto.go
+- routes.go
+
+Do not create microservices unless explicitly requested.
+
+Keep business logic inside service layer.
+
+Handlers should only:
+- parse request
+- validate input
+- call service
+- return response
+
+Repositories should only:
+- query database
+- map database result
+
+# Code Quality Rules
+
+Write simple Go code.
+
+Prefer clear code over clever code.
+
+Use context.Context in service and repository methods.
+
+Return typed errors from business logic.
+
+Do not panic in normal application flow.
+
+Do not put business logic in main.go.
+
+Use dependency injection through constructors.
+
+# Security Rules
+
+Never hardcode secrets.
+
+Use environment variables for:
+- database URL
+- JWT secret
+- payment keys
+- Firebase keys
+- SMTP keys
+
+Never expose internal error details to API users.
+
+Validate all request bodies.
+
+Check authentication and authorization before modifying data.
+
+# Output Rules
+
+When generating code:
+- include file path
+- include complete code
+- explain where to place it
+- mention required commands

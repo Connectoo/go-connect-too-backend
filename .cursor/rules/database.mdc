@@ -1,0 +1,52 @@
+---
+description: PostgreSQL and database rules
+globs:
+  - "**/*.sql"
+  - "**/repository.go"
+alwaysApply: false
+---
+
+# Database Rules
+
+Use PostgreSQL.
+
+Use migrations for all schema changes.
+
+Do not modify database schema directly without creating migration files.
+
+Use UUID primary keys unless there is a strong reason not to.
+
+Every main table should include:
+- id
+- created_at
+- updated_at
+
+Use soft delete only where needed.
+
+Add indexes for:
+- foreign keys
+- search fields
+- frequently filtered columns
+
+# Marketplace Tables
+
+Core tables:
+- users
+- provider_profiles
+- service_categories
+- services
+- bookings
+- booking_status_history
+- payments
+- reviews
+- notifications
+
+# Repository Rules
+
+Repository should not contain business rules.
+
+Use transactions for:
+- booking creation
+- payment confirmation
+- wallet/deduction logic
+- multi-table updates

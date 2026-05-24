@@ -1,0 +1,49 @@
+---
+description: REST API design rules
+globs:
+  - "**/handler.go"
+  - "**/routes.go"
+alwaysApply: false
+---
+
+# API Rules
+
+Use REST-style endpoints.
+
+Version all APIs with /api/v1.
+
+Use plural resource names.
+
+Examples:
+- POST /api/v1/auth/register
+- POST /api/v1/auth/login
+- GET /api/v1/services
+- POST /api/v1/bookings
+- PATCH /api/v1/bookings/{id}/cancel
+- POST /api/v1/payments/create-order
+- POST /api/v1/payments/webhook
+
+# Handler Rules
+
+Handlers must:
+- decode request
+- validate input
+- call service
+- return standard response
+
+Handlers must not:
+- query database directly
+- contain payment business logic
+- contain booking state logic
+
+# Status Codes
+
+Use:
+- 200 for success
+- 201 for created
+- 400 for validation error
+- 401 for unauthenticated
+- 403 for unauthorized
+- 404 for not found
+- 409 for conflict
+- 500 for internal error
