@@ -65,6 +65,12 @@ Phase 1 foundation for the service marketplace modular monolith API.
    curl -s http://localhost:8080/api/v1/health | jq
    ```
 
+6. API docs (Swagger UI, disabled when `APP_ENV=production`):
+
+   Open in a browser: [http://localhost:8080/api/v1/docs/](http://localhost:8080/api/v1/docs/)
+
+   Raw OpenAPI spec: [http://localhost:8080/api/v1/docs/openapi.yaml](http://localhost:8080/api/v1/docs/openapi.yaml)
+
 ## Makefile commands
 
 | Command | Description |
@@ -113,10 +119,26 @@ Failure when database is unreachable (`503`):
 | `DB_MAX_IDLE_CONNS` | no | `5` | Max idle DB connections |
 | `DB_CONN_MAX_LIFETIME_SEC` | no | `300` | Connection max lifetime |
 
-## Phase 2 (planned)
+## API documentation
 
-- Auth module (JWT access/refresh)
-- Users and roles
+When `APP_ENV` is not `production`, the server serves:
+
+| URL | Description |
+|-----|-------------|
+| `/api/v1/docs/` | Swagger UI (try endpoints in the browser) |
+| `/api/v1/docs/openapi.yaml` | OpenAPI 3.0 spec |
+
+The spec source lives at `internal/app/spec/openapi.yaml`. Update it when you add endpoints.
+
+For `/auth/me` in Swagger UI: run **Login** or **Register**, copy `data.tokens.access_token`, click **Authorize**, paste `Bearer <token>` (or just the token if the UI adds the prefix).
+
+## Phase 2
+
+- Auth module (JWT access/refresh) — implemented
+- Users and roles — implemented
+
+## Later phases
+
 - sqlc query generation wired to migrations
 - Request validation helpers
 - Graceful config for production secrets

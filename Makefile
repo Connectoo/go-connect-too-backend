@@ -1,4 +1,11 @@
-.PHONY: run test migrate-up migrate-down tidy fmt
+.PHONY: run test migrate-up migrate-down install-tools tidy fmt
+
+MIGRATE := $(shell go env GOPATH)/bin/migrate
+
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
 
 run:
 	go run ./cmd/api
@@ -6,11 +13,17 @@ run:
 test:
 	go test ./...
 
-migrate-up:
-	migrate -path migrations -database "$(DATABASE_URL)" up
+install-tools:
+	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
-migrate-down:
-	migrate -path migrations -database "$(DATABASE_URL)" down 1
+migrate-up: $(MIGRATE)
+	$(MIGRATE) -path migrations -database "$(DATABASE_URL)" up
+
+migrate-down: $(MIGRATE)
+	$(MIGRATE) -path migrations -database "$(DATABASE_URL)" down 1
+
+$(MIGRATE):
+	$(MAKE) install-tools
 
 tidy:
 	go mod tidy
