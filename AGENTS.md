@@ -127,3 +127,45 @@ Responsibilities:
 
 Prompt:
 You are a backend security engineer. Review code for authentication, authorization, validation, secret handling, and unsafe database operations. Never expose internal errors or secrets.
+
+## Cursor Cloud specific instructions
+
+### Services
+
+| Service | How to run |
+|---------|-----------|
+| PostgreSQL 16 | `docker compose up -d` (host port 5433) |
+| Go API server | `make run` (port 8080) |
+
+### Key gotcha: DATABASE_URL mismatch
+
+The committed `.env` uses `postgres://postgres:1234@localhost:5432/...` which does not match docker-compose (`app:app` on port `5433`). When running with docker-compose, override the DATABASE_URL:
+
+```
+DATABASE_URL="postgres://app:app@localhost:5433/go_connect?sslmode=disable"
+```
+
+Pass this as an env var prefix when running `make run`, `make migrate-up`, or other DB-dependent commands.
+
+### Standard commands
+
+See `Makefile` and `README.md` for the full list. Key commands:
+- `make run` — start API server
+- `make test` — run all Go tests
+- `make migrate-up` — apply DB migrations
+- `make fmt` — format code with gofmt
+- `make install-tools` — install golang-migrate CLI
+
+### Running the API server
+
+1. Start Docker daemon: `sudo dockerd &` (if not already running)
+2. Start PostgreSQL: `docker compose up -d`
+3. Run migrations: `DATABASE_URL="postgres://app:app@localhost:5433/go_connect?sslmode=disable" make migrate-up`
+4. Start server: `DATABASE_URL="postgres://app:app@localhost:5433/go_connect?sslmode=disable" make run`
+5. Health check: `curl http://localhost:8080/api/v1/health`
+
+### Notes
+
+- Docker must be installed and running (not included in the update script since it's a system dependency).
+- The API has no external service dependencies beyond PostgreSQL (no Redis, Firebase, or payment gateways are wired up yet).
+- Swagger UI is available at `http://localhost:8080/api/v1/docs/` when `APP_ENV` is not `production`.
