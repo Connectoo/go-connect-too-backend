@@ -6,10 +6,28 @@ import (
 	"github.com/google/uuid"
 )
 
-// Profile links an employee account to optional workforce metadata (expanded in later phases).
+const (
+	VerificationPending  = "pending"
+	VerificationApproved = "approved"
+	VerificationRejected = "rejected"
+)
+
+// Profile is an employee workforce profile.
 type Profile struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID                  uuid.UUID
+	UserID              uuid.UUID
+	DisplayName         *string
+	Phone               *string
+	Bio                 *string
+	ExperienceYears     int
+	ProfilePhotoURL     *string
+	LocationText        *string
+	Latitude            *float64
+	Longitude           *float64
+	ServiceAreaRadiusKm *float64
+	Languages           []string
+	Skills              []string
+	VerificationStatus  string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }

@@ -13,8 +13,12 @@ import (
 
 	"github.com/MustafaKheda/go-connect-too-backend/internal/config"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/auth"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/availability"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/categories"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/customers"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/kyc"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/services"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
@@ -58,10 +62,29 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	authRepo := auth.NewRepository(sqlDB)
 	authSvc := auth.NewService(cfg, userRepo, registrar, authRepo, tokenManager)
 	authHandler := auth.NewHandler(authSvc, log)
+	employeeSvc := employees.NewService(employeeRepo)
+	employeeHandler := employees.NewHandler(employeeSvc, log)
+	kycRepo := kyc.NewRepository(sqlDB)
+	kycSvc := kyc.NewService(kyc.NewEmployeeRepositoryAdapter(employeeRepo), kycRepo)
+	kycHandler := kyc.NewHandler(kycSvc, log)
+	categoryRepo := categories.NewRepository(sqlDB)
+	categorySvc := categories.NewService(categoryRepo)
+	categoryHandler := categories.NewHandler(categorySvc, log)
+	serviceRepo := services.NewRepository(sqlDB)
+	serviceSvc := services.NewService(employeeRepo, serviceRepo)
+	serviceHandler := services.NewHandler(serviceSvc, log)
+	availabilityRepo := availability.NewRepository(sqlDB)
+	availabilitySvc := availability.NewService(employeeRepo, availabilityRepo)
+	availabilityHandler := availability.NewHandler(availabilitySvc, log)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", s.healthCheck)
 		auth.RegisterRoutes(r, authHandler, tokenManager)
+		employees.RegisterRoutes(r, employeeHandler, tokenManager)
+		kyc.RegisterRoutes(r, kycHandler, tokenManager)
+		categories.RegisterRoutes(r, categoryHandler, tokenManager)
+		services.RegisterRoutes(r, serviceHandler, tokenManager)
+		availability.RegisterRoutes(r, availabilityHandler, tokenManager)
 		if cfg.AppEnv != "production" {
 			registerDocsRoutes(r)
 		}

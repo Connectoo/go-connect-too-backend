@@ -9,6 +9,7 @@ const (
 	CodeUnauthorized       = "UNAUTHORIZED"
 	CodeForbidden          = "FORBIDDEN"
 	CodeConflict           = "CONFLICT"
+	CodeNotFound           = "NOT_FOUND"
 	CodeInvalidToken       = "INVALID_TOKEN"
 	CodeInvalidCredentials = "INVALID_CREDENTIALS"
 )

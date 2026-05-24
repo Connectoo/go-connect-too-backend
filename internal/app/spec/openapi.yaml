@@ -11,6 +11,9 @@ servers:
 tags:
   - name: Health
   - name: Auth
+  - name: Employees
+  - name: Employee Services
+  - name: Categories
 
 paths:
   /health:
@@ -205,6 +208,388 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /employee/profile:
+    get:
+      tags: [Employees]
+      summary: Get employee profile
+      operationId: getEmployeeProfile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Employee profile loaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeProfileSuccessEnvelope"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      tags: [Employees]
+      summary: Update employee profile
+      operationId: updateEmployeeProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmployeeProfileRequest"
+      responses:
+        "200":
+          description: Employee profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeProfileSuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /employee/kyc:
+    get:
+      tags: [Employees]
+      summary: Get employee KYC
+      operationId: getEmployeeKYC
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: KYC loaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeKYCSuccessEnvelope"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [Employees]
+      summary: Submit employee KYC
+      operationId: submitEmployeeKYC
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitEmployeeKYCRequest"
+      responses:
+        "201":
+          description: KYC submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeKYCSuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /admin/employees/{id}/approve:
+    patch:
+      tags: [Employees]
+      summary: Approve employee profile
+      operationId: approveEmployeeProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Employee profile approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeProfileSuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /admin/employees/{id}/reject:
+    patch:
+      tags: [Employees]
+      summary: Reject employee profile
+      operationId: rejectEmployeeProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Employee profile rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeProfileSuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /employee/services:
+    post:
+      tags: [Employee Services]
+      summary: Create employee service
+      operationId: createEmployeeService
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeServiceRequest"
+      responses:
+        "201":
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeServiceSuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    get:
+      tags: [Employee Services]
+      summary: List employee services
+      operationId: listEmployeeServices
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Services loaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeServiceListSuccessEnvelope"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /employee/services/{id}:
+    put:
+      tags: [Employee Services]
+      summary: Update employee service
+      operationId: updateEmployeeService
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmployeeServiceRequest"
+      responses:
+        "200":
+          description: Service updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeServiceSuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Employee Services]
+      summary: Delete employee service
+      operationId: deleteEmployeeService
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Service deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /employee/services/{id}/status:
+    patch:
+      tags: [Employee Services]
+      summary: Activate or deactivate employee service
+      operationId: updateEmployeeServiceStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmployeeServiceStatusRequest"
+      responses:
+        "200":
+          description: Service status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeServiceSuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /categories:
+    get:
+      tags: [Categories]
+      summary: List active categories
+      operationId: listCategories
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Active categories loaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryListSuccessEnvelope"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /admin/categories:
+    post:
+      tags: [Categories]
+      summary: Create category
+      operationId: createCategory
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategorySuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -284,6 +669,16 @@ components:
             success: false
             message: Something went wrong
             error: INTERNAL_ERROR
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            message: Employee profile not found
+            error: NOT_FOUND
 
   schemas:
     SuccessEnvelope:
@@ -425,3 +820,302 @@ components:
           $ref: "#/components/schemas/UserResponse"
         tokens:
           $ref: "#/components/schemas/TokenPair"
+
+    EmployeeProfileResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        experience_years:
+          type: integer
+        profile_photo_url:
+          type: string
+          nullable: true
+        location_text:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          format: double
+          nullable: true
+        longitude:
+          type: number
+          format: double
+          nullable: true
+        service_area_radius_km:
+          type: number
+          format: double
+          nullable: true
+        languages:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+        verification_status:
+          type: string
+          enum: [pending, approved, rejected]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UpdateEmployeeProfileRequest:
+      type: object
+      required: [display_name, phone]
+      properties:
+        display_name:
+          type: string
+        phone:
+          type: string
+        bio:
+          type: string
+          nullable: true
+        experience_years:
+          type: integer
+          minimum: 0
+        profile_photo_url:
+          type: string
+          nullable: true
+        location_text:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        service_area_radius_km:
+          type: number
+          format: double
+          minimum: 0
+        languages:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+
+    EmployeeProfileSuccessEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/EmployeeProfileResponse"
+
+    SubmitEmployeeKYCRequest:
+      type: object
+      required: [id_proof_url, address_proof_url]
+      properties:
+        id_proof_url:
+          type: string
+          format: uri
+          example: https://cdn.example.com/id.pdf
+        address_proof_url:
+          type: string
+          format: uri
+          example: https://cdn.example.com/address.pdf
+
+    EmployeeKYCResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        id_proof_url:
+          type: string
+          format: uri
+        address_proof_url:
+          type: string
+          format: uri
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        rejection_reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    EmployeeKYCSuccessEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/EmployeeKYCResponse"
+
+    EmployeeServiceRequestBase:
+      type: object
+      required: [category_id, title, price, duration_minutes]
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 150
+          example: Deep home cleaning
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+          example: Full home deep cleaning service
+        price:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 1200
+        duration_minutes:
+          type: integer
+          minimum: 1
+          example: 90
+        is_active:
+          type: boolean
+          default: false
+
+    CreateEmployeeServiceRequest:
+      allOf:
+        - $ref: "#/components/schemas/EmployeeServiceRequestBase"
+
+    UpdateEmployeeServiceRequest:
+      allOf:
+        - $ref: "#/components/schemas/EmployeeServiceRequestBase"
+
+    UpdateEmployeeServiceStatusRequest:
+      type: object
+      required: [is_active]
+      properties:
+        is_active:
+          type: boolean
+
+    EmployeeServiceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        category_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        price:
+          type: number
+          format: double
+        duration_minutes:
+          type: integer
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    EmployeeServiceSuccessEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/EmployeeServiceResponse"
+
+    EmployeeServiceListSuccessEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/EmployeeServiceResponse"
+
+    CategoryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          example: Plumbing
+        description:
+          type: string
+          nullable: true
+          example: Home plumbing and repairs
+        is_active:
+          type: boolean
+          default: true
+
+    CategorySuccessEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/CategoryResponse"
+
+    CategoryListSuccessEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/CategoryResponse"
