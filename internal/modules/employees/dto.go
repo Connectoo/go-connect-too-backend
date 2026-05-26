@@ -17,7 +17,23 @@ type UpdateProfileRequest struct {
 	Skills              []string `json:"skills"`
 }
 
-// ProfileResponse is the public employee profile payload.
+// PublicProfileResponse is the marketplace-visible employee profile.
+type PublicProfileResponse struct {
+	ID                  uuid.UUID `json:"id"`
+	DisplayName         *string   `json:"display_name,omitempty"`
+	Bio                 *string   `json:"bio,omitempty"`
+	ExperienceYears     int       `json:"experience_years"`
+	ProfilePhotoURL     *string   `json:"profile_photo_url,omitempty"`
+	LocationText        *string   `json:"location_text,omitempty"`
+	Latitude            *float64  `json:"latitude,omitempty"`
+	Longitude           *float64  `json:"longitude,omitempty"`
+	ServiceAreaRadiusKm *float64  `json:"service_area_radius_km,omitempty"`
+	Languages           []string  `json:"languages"`
+	Skills              []string  `json:"skills"`
+	Rating              *float64  `json:"rating,omitempty"`
+}
+
+// ProfileResponse is the authenticated employee profile payload.
 type ProfileResponse struct {
 	ID                  uuid.UUID `json:"id"`
 	UserID              uuid.UUID `json:"user_id"`

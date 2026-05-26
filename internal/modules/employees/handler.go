@@ -25,6 +25,22 @@ func NewHandler(svc *Service, log *slog.Logger) *Handler {
 	return &Handler{svc: svc, log: log}
 }
 
+func (h *Handler) getPublicProfile(w http.ResponseWriter, r *http.Request) {
+	profileID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid employee id", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.GetPublicProfile(r.Context(), profileID)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Employee profile loaded", res)
+}
+
 func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

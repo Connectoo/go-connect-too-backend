@@ -18,6 +18,7 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/customers"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/kyc"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/search"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/services"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
@@ -76,10 +77,17 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	availabilityRepo := availability.NewRepository(sqlDB)
 	availabilitySvc := availability.NewService(employeeRepo, availabilityRepo)
 	availabilityHandler := availability.NewHandler(availabilitySvc, log)
+	userSvc := users.NewService(userRepo, userRepo)
+	userHandler := users.NewHandler(userSvc, log)
+	searchRepo := search.NewRepository(sqlDB)
+	searchSvc := search.NewService(searchRepo)
+	searchHandler := search.NewHandler(searchSvc, log)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", s.healthCheck)
 		auth.RegisterRoutes(r, authHandler, tokenManager)
+		users.RegisterRoutes(r, userHandler, tokenManager)
+		search.RegisterRoutes(r, searchHandler)
 		employees.RegisterRoutes(r, employeeHandler, tokenManager)
 		kyc.RegisterRoutes(r, kycHandler, tokenManager)
 		categories.RegisterRoutes(r, categoryHandler, tokenManager)

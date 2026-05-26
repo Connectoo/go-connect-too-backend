@@ -25,6 +25,58 @@ func NewHandler(svc *Service, log *slog.Logger) *Handler {
 	return &Handler{svc: svc, log: log}
 }
 
+func (h *Handler) listPublic(w http.ResponseWriter, r *http.Request) {
+	var categoryID *uuid.UUID
+	if raw := r.URL.Query().Get("category_id"); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			response.Error(w, http.StatusBadRequest, "Invalid category_id", sharederrors.CodeValidationError)
+			return
+		}
+		categoryID = &id
+	}
+
+	items, err := h.svc.ListPublic(r.Context(), categoryID)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Services loaded", items)
+}
+
+func (h *Handler) listPublicByEmployee(w http.ResponseWriter, r *http.Request) {
+	employeeID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid employee id", sharederrors.CodeValidationError)
+		return
+	}
+
+	items, err := h.svc.ListPublicByEmployee(r.Context(), employeeID)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Employee services loaded", items)
+}
+
+func (h *Handler) getPublic(w http.ResponseWriter, r *http.Request) {
+	serviceID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid service id", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.GetPublic(r.Context(), serviceID)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Service loaded", res)
+}
+
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

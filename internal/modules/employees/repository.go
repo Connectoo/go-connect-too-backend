@@ -54,6 +54,21 @@ func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) (*Profil
 	return profile, nil
 }
 
+// GetApprovedByID loads a profile only when verification is approved.
+func (r *Repository) GetApprovedByID(ctx context.Context, id uuid.UUID) (*Profile, error) {
+	query := `SELECT` + profileColumns + ` FROM employee_profiles WHERE id = $1 AND verification_status = $2`
+
+	row := r.db.QueryRowContext(ctx, query, id, VerificationApproved)
+	profile, err := scanProfile(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get approved employee profile: %w", err)
+	}
+	return profile, nil
+}
+
 // GetByID loads a profile by primary key.
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Profile, error) {
 	query := `SELECT` + profileColumns + ` FROM employee_profiles WHERE id = $1`

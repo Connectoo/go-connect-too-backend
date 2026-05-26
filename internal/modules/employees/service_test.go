@@ -51,6 +51,15 @@ func (m *mockProfileStore) GetByID(_ context.Context, id uuid.UUID) (*Profile, e
 	return &copy, nil
 }
 
+func (m *mockProfileStore) GetApprovedByID(_ context.Context, id uuid.UUID) (*Profile, error) {
+	profile, ok := m.byID[id]
+	if !ok || profile.VerificationStatus != VerificationApproved {
+		return nil, ErrNotFound
+	}
+	copy := *profile
+	return &copy, nil
+}
+
 func (m *mockProfileStore) UpdateByUserID(_ context.Context, userID uuid.UUID, profile *Profile, at time.Time) (*Profile, error) {
 	existing, ok := m.byUserID[userID]
 	if !ok {

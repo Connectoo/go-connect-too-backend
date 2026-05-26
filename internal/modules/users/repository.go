@@ -74,6 +74,27 @@ func (r *Repository) GetByEmailAndRole(ctx context.Context, email, role string) 
 	return scanUser(row)
 }
 
+// Update replaces editable user fields.
+func (r *Repository) Update(ctx context.Context, user *User, at time.Time) (*User, error) {
+	query := `
+		UPDATE users
+		SET name = $2,
+		    phone = $3,
+		    updated_at = $4
+		WHERE id = $1
+		RETURNING id, name, email, phone, password_hash, role, status, created_at, updated_at`
+
+	row := r.db.QueryRowContext(ctx, query, user.ID, user.Name, user.Phone, at)
+	updated, err := scanUser(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("update user: %w", err)
+	}
+	return updated, nil
+}
+
 // GetByID returns a user by id.
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	query := `

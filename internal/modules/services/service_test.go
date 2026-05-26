@@ -39,6 +39,18 @@ func (m *mockStore) CategoryExists(_ context.Context, categoryID uuid.UUID) (boo
 	return m.categories[categoryID], nil
 }
 
+func (m *mockStore) ListPublicActive(_ context.Context, _ *uuid.UUID, _ int) ([]EmployeeService, error) {
+	return []EmployeeService{}, nil
+}
+
+func (m *mockStore) GetPublicActiveByID(_ context.Context, _ uuid.UUID) (*EmployeeService, error) {
+	return nil, ErrNotFound
+}
+
+func (m *mockStore) ListActiveByEmployeeProfileID(_ context.Context, _ uuid.UUID) ([]EmployeeService, error) {
+	return []EmployeeService{}, nil
+}
+
 func (m *mockStore) ListByEmployeeID(_ context.Context, employeeID uuid.UUID) ([]EmployeeService, error) {
 	out := []EmployeeService{}
 	for _, service := range m.services {

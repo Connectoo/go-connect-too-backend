@@ -26,6 +26,9 @@ type EmployeeProfileStore interface {
 type Store interface {
 	CategoryExists(ctx context.Context, categoryID uuid.UUID) (bool, error)
 	ListByEmployeeID(ctx context.Context, employeeID uuid.UUID) ([]EmployeeService, error)
+	ListPublicActive(ctx context.Context, categoryID *uuid.UUID, limit int) ([]EmployeeService, error)
+	GetPublicActiveByID(ctx context.Context, serviceID uuid.UUID) (*EmployeeService, error)
+	ListActiveByEmployeeProfileID(ctx context.Context, employeeID uuid.UUID) ([]EmployeeService, error)
 	Create(ctx context.Context, service *EmployeeService) (*EmployeeService, error)
 	Update(ctx context.Context, employeeID, serviceID uuid.UUID, service *EmployeeService, at time.Time) (*EmployeeService, error)
 	Delete(ctx context.Context, employeeID, serviceID uuid.UUID) error
@@ -164,8 +167,43 @@ func (s *Service) UpdateStatus(ctx context.Context, userID, serviceID uuid.UUID,
 	return toResponse(updated), nil
 }
 
+// ListPublic returns active services from approved employees.
+func (s *Service) ListPublic(ctx context.Context, categoryID *uuid.UUID) ([]ServiceResponse, error) {
+	items, err := s.store.ListPublicActive(ctx, categoryID, 50)
+	if err != nil {
+		return nil, err
+	}
+	return toResponseList(items), nil
+}
+
+// GetPublic returns an active service from an approved employee.
+func (s *Service) GetPublic(ctx context.Context, serviceID uuid.UUID) (*ServiceResponse, error) {
+	service, err := s.store.GetPublicActiveByID(ctx, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	return toResponse(service), nil
+}
+
+// ListPublicByEmployee returns active services for an approved employee profile.
+func (s *Service) ListPublicByEmployee(ctx context.Context, employeeID uuid.UUID) ([]ServiceResponse, error) {
+	items, err := s.store.ListActiveByEmployeeProfileID(ctx, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	return toResponseList(items), nil
+}
+
 func (s *Service) profileForUser(ctx context.Context, userID uuid.UUID) (*employees.Profile, error) {
 	return s.profiles.GetByUserID(ctx, userID)
+}
+
+func toResponseList(items []EmployeeService) []ServiceResponse {
+	out := make([]ServiceResponse, 0, len(items))
+	for i := range items {
+		out = append(out, *toResponse(&items[i]))
+	}
+	return out
 }
 
 func (s *Service) ensureCategoryExists(ctx context.Context, categoryID uuid.UUID) error {

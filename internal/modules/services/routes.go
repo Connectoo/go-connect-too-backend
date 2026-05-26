@@ -10,6 +10,10 @@ import (
 
 // RegisterRoutes mounts employee service endpoints on the router.
 func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
+	r.Get("/services", h.listPublic)
+	r.Get("/services/{id}", h.getPublic)
+	r.Get("/employees/{id}/services", h.listPublicByEmployee)
+
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Authenticate(tokens))
 		r.Use(middleware.RequireRole(users.RoleEmployee))

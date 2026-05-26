@@ -10,6 +10,8 @@ import (
 
 // RegisterRoutes mounts employee availability endpoints on the router.
 func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
+	r.Get("/employees/{id}/availability", h.listPublic)
+
 	r.Route("/employee/availability", func(r chi.Router) {
 		r.Use(middleware.Authenticate(tokens))
 		r.Use(middleware.RequireRole(users.RoleEmployee))

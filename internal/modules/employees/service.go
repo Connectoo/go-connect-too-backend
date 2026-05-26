@@ -13,6 +13,7 @@ import (
 type ProfileStore interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*Profile, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*Profile, error)
+	GetApprovedByID(ctx context.Context, id uuid.UUID) (*Profile, error)
 	UpdateByUserID(ctx context.Context, userID uuid.UUID, profile *Profile, at time.Time) (*Profile, error)
 	UpdateVerificationStatus(ctx context.Context, id uuid.UUID, status string, at time.Time) (*Profile, error)
 }
@@ -29,6 +30,15 @@ func NewService(profiles ProfileStore) *Service {
 		profiles: profiles,
 		now:      func() time.Time { return time.Now().UTC() },
 	}
+}
+
+// GetPublicProfile returns an approved employee profile for marketplace browsing.
+func (s *Service) GetPublicProfile(ctx context.Context, profileID uuid.UUID) (*PublicProfileResponse, error) {
+	profile, err := s.profiles.GetApprovedByID(ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
+	return toPublicProfileResponse(profile), nil
 }
 
 // GetProfile returns the authenticated employee's profile.
@@ -137,6 +147,23 @@ func normalizeStringList(values []string) []string {
 		return []string{}
 	}
 	return out
+}
+
+func toPublicProfileResponse(profile *Profile) *PublicProfileResponse {
+	return &PublicProfileResponse{
+		ID:                  profile.ID,
+		DisplayName:         profile.DisplayName,
+		Bio:                 profile.Bio,
+		ExperienceYears:     profile.ExperienceYears,
+		ProfilePhotoURL:     profile.ProfilePhotoURL,
+		LocationText:        profile.LocationText,
+		Latitude:            profile.Latitude,
+		Longitude:           profile.Longitude,
+		ServiceAreaRadiusKm: profile.ServiceAreaRadiusKm,
+		Languages:           profile.Languages,
+		Skills:              profile.Skills,
+		Rating:              nil,
+	}
 }
 
 func toProfileResponse(profile *Profile) *ProfileResponse {
