@@ -14,6 +14,7 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/config"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/auth"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/availability"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/bookings"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/categories"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/customers"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
@@ -82,6 +83,9 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	searchRepo := search.NewRepository(sqlDB)
 	searchSvc := search.NewService(searchRepo)
 	searchHandler := search.NewHandler(searchSvc, log)
+	bookingRepo := bookings.NewRepository(sqlDB)
+	bookingSvc := bookings.NewService(customerRepo, employeeRepo, serviceRepo, bookingRepo, bookings.NoopEventPublisher{})
+	bookingHandler := bookings.NewHandler(bookingSvc, log)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", s.healthCheck)
@@ -93,6 +97,7 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		categories.RegisterRoutes(r, categoryHandler, tokenManager)
 		services.RegisterRoutes(r, serviceHandler, tokenManager)
 		availability.RegisterRoutes(r, availabilityHandler, tokenManager)
+		bookings.RegisterRoutes(r, bookingHandler, tokenManager)
 		if cfg.AppEnv != "production" {
 			registerDocsRoutes(r)
 		}
