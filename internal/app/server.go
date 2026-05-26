@@ -19,9 +19,12 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/customers"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/kyc"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/payments"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/search"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/services"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/subscriptions"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/webhooks"
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/response"
@@ -72,8 +75,16 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	categoryRepo := categories.NewRepository(sqlDB)
 	categorySvc := categories.NewService(categoryRepo)
 	categoryHandler := categories.NewHandler(categorySvc, log)
+	subscriptionRepo := subscriptions.NewRepository(sqlDB)
+	razorpayGateway := payments.NewRazorpayGateway(cfg.RazorpayKeyID, cfg.RazorpayKeySecret, cfg.RazorpayWebhookSecret)
+	paymentRepo := payments.NewRepository(sqlDB)
+	paymentSvc := payments.NewService(employeeRepo, paymentRepo, razorpayGateway, razorpayGateway.KeyID())
+	paymentHandler := payments.NewHandler(paymentSvc, log)
+	subscriptionSvc := subscriptions.NewService(employeeRepo, subscriptionRepo, paymentSvc)
+	subscriptionHandler := subscriptions.NewHandler(subscriptionSvc, log)
+	webhookHandler := webhooks.NewHandler(paymentSvc, log)
 	serviceRepo := services.NewRepository(sqlDB)
-	serviceSvc := services.NewService(employeeRepo, serviceRepo)
+	serviceSvc := services.NewService(employeeRepo, serviceRepo, subscriptionRepo)
 	serviceHandler := services.NewHandler(serviceSvc, log)
 	availabilityRepo := availability.NewRepository(sqlDB)
 	availabilitySvc := availability.NewService(employeeRepo, availabilityRepo)
@@ -95,6 +106,9 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		employees.RegisterRoutes(r, employeeHandler, tokenManager)
 		kyc.RegisterRoutes(r, kycHandler, tokenManager)
 		categories.RegisterRoutes(r, categoryHandler, tokenManager)
+		subscriptions.RegisterRoutes(r, subscriptionHandler, tokenManager)
+		payments.RegisterRoutes(r, paymentHandler, tokenManager)
+		webhooks.RegisterRoutes(r, webhookHandler)
 		services.RegisterRoutes(r, serviceHandler, tokenManager)
 		availability.RegisterRoutes(r, availabilityHandler, tokenManager)
 		bookings.RegisterRoutes(r, bookingHandler, tokenManager)

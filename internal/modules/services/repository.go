@@ -61,6 +61,28 @@ func (r *Repository) ListByEmployeeID(ctx context.Context, employeeID uuid.UUID)
 	return out, nil
 }
 
+// CountActiveByEmployeeID counts active service listings owned by an employee.
+func (r *Repository) CountActiveByEmployeeID(ctx context.Context, employeeID uuid.UUID) (int, error) {
+	query := `SELECT COUNT(*) FROM employee_services WHERE employee_id = $1 AND is_active = true`
+
+	var count int
+	if err := r.db.QueryRowContext(ctx, query, employeeID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count active employee services: %w", err)
+	}
+	return count, nil
+}
+
+// CountActiveExcludingID counts active listings except the current service.
+func (r *Repository) CountActiveExcludingID(ctx context.Context, employeeID, serviceID uuid.UUID) (int, error) {
+	query := `SELECT COUNT(*) FROM employee_services WHERE employee_id = $1 AND id <> $2 AND is_active = true`
+
+	var count int
+	if err := r.db.QueryRowContext(ctx, query, employeeID, serviceID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count active employee services excluding service: %w", err)
+	}
+	return count, nil
+}
+
 // Create inserts a service listing.
 func (r *Repository) Create(ctx context.Context, service *EmployeeService) (*EmployeeService, error) {
 	query := `

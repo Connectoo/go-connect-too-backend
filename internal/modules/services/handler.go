@@ -208,6 +208,8 @@ func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
 		response.Error(w, http.StatusNotFound, "Service not found", sharederrors.CodeNotFound)
 	case errors.Is(err, ErrProfileIncomplete):
 		response.Error(w, http.StatusConflict, "Complete employee profile before activating services", sharederrors.CodeConflict)
+	case errors.Is(err, ErrServiceLimit):
+		response.Error(w, http.StatusConflict, "Subscription service limit reached", sharederrors.CodeConflict)
 	default:
 		if h.log != nil {
 			h.log.Error("employee service request failed", slog.String("error", err.Error()))

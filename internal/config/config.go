@@ -24,6 +24,10 @@ type Config struct {
 	JWTRefreshSecret string
 	JWTAccessTTL     time.Duration
 	JWTRefreshTTL    time.Duration
+
+	RazorpayKeyID         string
+	RazorpayKeySecret     string
+	RazorpayWebhookSecret string
 }
 
 // Load reads configuration from the environment.
@@ -78,17 +82,20 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		AppEnv:            getEnv("APP_ENV", "development"),
-		HTTPPort:          port,
-		DatabaseURL:       databaseURL,
-		LogLevel:          getEnv("LOG_LEVEL", "info"),
-		DBMaxOpenConns:    maxOpen,
-		DBMaxIdleConns:    maxIdle,
-		DBConnMaxLifetime: time.Duration(connLifetimeSec) * time.Second,
-		JWTAccessSecret:   accessSecret,
-		JWTRefreshSecret:  refreshSecret,
-		JWTAccessTTL:      time.Duration(accessTTLMin) * time.Minute,
-		JWTRefreshTTL:     time.Duration(refreshTTLDays) * 24 * time.Hour,
+		AppEnv:                getEnv("APP_ENV", "development"),
+		HTTPPort:              port,
+		DatabaseURL:           databaseURL,
+		LogLevel:              getEnv("LOG_LEVEL", "info"),
+		DBMaxOpenConns:        maxOpen,
+		DBMaxIdleConns:        maxIdle,
+		DBConnMaxLifetime:     time.Duration(connLifetimeSec) * time.Second,
+		JWTAccessSecret:       accessSecret,
+		JWTRefreshSecret:      refreshSecret,
+		JWTAccessTTL:          time.Duration(accessTTLMin) * time.Minute,
+		JWTRefreshTTL:         time.Duration(refreshTTLDays) * 24 * time.Hour,
+		RazorpayKeyID:         os.Getenv("RAZORPAY_KEY_ID"),
+		RazorpayKeySecret:     os.Getenv("RAZORPAY_KEY_SECRET"),
+		RazorpayWebhookSecret: os.Getenv("RAZORPAY_WEBHOOK_SECRET"),
 	}, nil
 }
 

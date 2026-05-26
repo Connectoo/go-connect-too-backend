@@ -26,6 +26,8 @@ type EmployeeProfileStore interface {
 type Store interface {
 	CategoryExists(ctx context.Context, categoryID uuid.UUID) (bool, error)
 	ListByEmployeeID(ctx context.Context, employeeID uuid.UUID) ([]EmployeeService, error)
+	CountActiveByEmployeeID(ctx context.Context, employeeID uuid.UUID) (int, error)
+	CountActiveExcludingID(ctx context.Context, employeeID, serviceID uuid.UUID) (int, error)
 	ListPublicActive(ctx context.Context, categoryID *uuid.UUID, limit int) ([]EmployeeService, error)
 	GetPublicActiveByID(ctx context.Context, serviceID uuid.UUID) (*EmployeeService, error)
 	ListActiveByEmployeeProfileID(ctx context.Context, employeeID uuid.UUID) ([]EmployeeService, error)
@@ -35,18 +37,29 @@ type Store interface {
 	UpdateStatus(ctx context.Context, employeeID, serviceID uuid.UUID, isActive bool, at time.Time) (*EmployeeService, error)
 }
 
+// SubscriptionLimitStore returns the current active plan limit for an employee.
+type SubscriptionLimitStore interface {
+	CurrentServiceLimit(ctx context.Context, employeeID uuid.UUID, at time.Time) (int, error)
+}
+
 // Service handles employee service business logic.
 type Service struct {
 	profiles EmployeeProfileStore
 	store    Store
+	limits   SubscriptionLimitStore
 	now      func() time.Time
 }
 
 // NewService creates an employee service manager.
-func NewService(profiles EmployeeProfileStore, store Store) *Service {
+func NewService(profiles EmployeeProfileStore, store Store, limits ...SubscriptionLimitStore) *Service {
+	var limitStore SubscriptionLimitStore
+	if len(limits) > 0 {
+		limitStore = limits[0]
+	}
 	return &Service{
 		profiles: profiles,
 		store:    store,
+		limits:   limitStore,
 		now:      func() time.Time { return time.Now().UTC() },
 	}
 }
@@ -67,6 +80,11 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateServic
 	}
 	if req.IsActive && !profileIsComplete(profile) {
 		return nil, ErrProfileIncomplete
+	}
+	if req.IsActive {
+		if err := s.ensureServiceLimit(ctx, profile.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	at := s.now()
@@ -125,6 +143,11 @@ func (s *Service) Update(ctx context.Context, userID, serviceID uuid.UUID, req U
 	if req.IsActive && !profileIsComplete(profile) {
 		return nil, ErrProfileIncomplete
 	}
+	if req.IsActive {
+		if err := s.ensureServiceLimit(ctx, profile.ID, serviceID); err != nil {
+			return nil, err
+		}
+	}
 
 	updated, err := s.store.Update(ctx, profile.ID, serviceID, &EmployeeService{
 		CategoryID:      req.CategoryID,
@@ -158,6 +181,11 @@ func (s *Service) UpdateStatus(ctx context.Context, userID, serviceID uuid.UUID,
 	}
 	if req.IsActive && !profileIsComplete(profile) {
 		return nil, ErrProfileIncomplete
+	}
+	if req.IsActive {
+		if err := s.ensureServiceLimit(ctx, profile.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	updated, err := s.store.UpdateStatus(ctx, profile.ID, serviceID, req.IsActive, s.now())
@@ -213,6 +241,32 @@ func (s *Service) ensureCategoryExists(ctx context.Context, categoryID uuid.UUID
 	}
 	if !exists {
 		return ErrCategoryNotFound
+	}
+	return nil
+}
+
+func (s *Service) ensureServiceLimit(ctx context.Context, employeeID uuid.UUID, excludeServiceID ...uuid.UUID) error {
+	if s.limits == nil {
+		return nil
+	}
+	limit, err := s.limits.CurrentServiceLimit(ctx, employeeID, s.now())
+	if err != nil {
+		return err
+	}
+	if limit < 0 {
+		return nil
+	}
+	var activeCount int
+	if len(excludeServiceID) > 0 {
+		activeCount, err = s.store.CountActiveExcludingID(ctx, employeeID, excludeServiceID[0])
+	} else {
+		activeCount, err = s.store.CountActiveByEmployeeID(ctx, employeeID)
+	}
+	if err != nil {
+		return err
+	}
+	if activeCount >= limit {
+		return ErrServiceLimit
 	}
 	return nil
 }
