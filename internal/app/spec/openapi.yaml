@@ -5,6 +5,8 @@ info:
   version: 1.0.0
 
 servers:
+  - url: https://go-connect-too-backend.vercel.app/api/v1
+    description: Production (Vercel)
   - url: http://localhost:8080/api/v1
     description: Local development
 

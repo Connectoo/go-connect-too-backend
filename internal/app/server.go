@@ -57,6 +57,7 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(chimiddleware.RealIP)
 	s.router.Use(chimiddleware.Recoverer)
+	s.router.Use(middleware.CORS)
 	s.router.Use(middleware.RequestLogger(log))
 
 	tokenManager := security.NewTokenManager(cfg.JWTAccessSecret, cfg.JWTAccessTTL)
