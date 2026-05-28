@@ -36,7 +36,7 @@ type Config struct {
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
-	port, err := strconv.Atoi(getEnv("HTTP_PORT", "8080"))
+	port, err := strconv.Atoi(getEnv("PORT", getEnv("HTTP_PORT", "8080")))
 	if err != nil {
 		return nil, fmt.Errorf("invalid HTTP_PORT: %w", err)
 	}
