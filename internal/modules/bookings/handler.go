@@ -13,6 +13,7 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/response"
 )
 
@@ -158,13 +159,14 @@ func (h *Handler) complete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listAdmin(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.ListForAdmin(r.Context())
+	page := pagination.Parse(r.URL.Query())
+	res, err := h.svc.ListForAdmin(r.Context(), r.URL.Query().Get("status"), page)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
 
-	response.JSON(w, http.StatusOK, "Bookings loaded", items)
+	response.JSON(w, http.StatusOK, "Bookings loaded", res)
 }
 
 func (h *Handler) getAdmin(w http.ResponseWriter, r *http.Request) {

@@ -11,6 +11,7 @@ import (
 
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/response"
 )
 
@@ -109,6 +110,46 @@ func (h *Handler) rejectProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.JSON(w, http.StatusOK, "Employee profile rejected", res)
+}
+
+func (h *Handler) listAdmin(w http.ResponseWriter, r *http.Request) {
+	page := pagination.Parse(r.URL.Query())
+	res, err := h.svc.ListAdmin(r.Context(), r.URL.Query().Get("verification_status"), r.URL.Query().Get("q"), page)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Employees loaded", res)
+}
+
+func (h *Handler) getAdmin(w http.ResponseWriter, r *http.Request) {
+	profileID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid employee profile id", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.GetAdmin(r.Context(), profileID)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Employee loaded", res)
+}
+
+func (h *Handler) suspendProfile(w http.ResponseWriter, r *http.Request) {
+	profileID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid employee profile id", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.SuspendProfile(r.Context(), profileID)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Employee suspended", res)
 }
 
 func decodeJSON(r *http.Request, dst interface{}) error {

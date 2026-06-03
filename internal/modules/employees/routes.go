@@ -24,7 +24,10 @@ func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
 		r.Use(middleware.Authenticate(tokens))
 		r.Use(middleware.RequireRole(users.RoleAdmin))
 
+		r.Get("/", h.listAdmin)
+		r.Get("/{id}", h.getAdmin)
 		r.Patch("/{id}/approve", h.approveProfile)
 		r.Patch("/{id}/reject", h.rejectProfile)
+		r.Patch("/{id}/suspend", h.suspendProfile)
 	})
 }

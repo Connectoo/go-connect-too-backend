@@ -10,10 +10,15 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 )
 
 type EmployeeProfileStore interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*employees.Profile, error)
+}
+
+type AdminStore interface {
+	ListAdmin(ctx context.Context, filter AdminListFilter) ([]Payment, int, error)
 }
 
 type Store interface {
@@ -67,12 +72,24 @@ func (s *Service) ListForEmployeeUser(ctx context.Context, userID uuid.UUID) ([]
 	return toResponses(items), nil
 }
 
-func (s *Service) ListAll(ctx context.Context) ([]PaymentResponse, error) {
+func (s *Service) ListAll(ctx context.Context, status string, page pagination.Params) (pagination.Result[PaymentResponse], error) {
+	if adminStore, ok := s.store.(AdminStore); ok {
+		items, total, err := adminStore.ListAdmin(ctx, AdminListFilter{
+			Status: status,
+			Offset: page.Offset(),
+			Limit:  page.Limit,
+		})
+		if err != nil {
+			return pagination.Result[PaymentResponse]{}, err
+		}
+		return pagination.NewResult(toResponses(items), page, total), nil
+	}
+
 	items, err := s.store.ListAll(ctx)
 	if err != nil {
-		return nil, err
+		return pagination.Result[PaymentResponse]{}, err
 	}
-	return toResponses(items), nil
+	return pagination.NewResult(toResponses(items), page, len(items)), nil
 }
 
 func (s *Service) ProcessRazorpayWebhook(ctx context.Context, payload []byte, signature, eventID string) error {

@@ -64,6 +64,21 @@ func (r *Repository) GetPublicActiveByID(ctx context.Context, serviceID uuid.UUI
 	return service, nil
 }
 
+// CountActivePublic returns the number of active public services.
+func (r *Repository) CountActivePublic(ctx context.Context) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM employee_services es
+		INNER JOIN employee_profiles ep ON ep.id = es.employee_id
+		WHERE es.is_active = true AND ep.verification_status = $1`
+
+	var count int
+	if err := r.db.QueryRowContext(ctx, query, employees.VerificationApproved).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count active public services: %w", err)
+	}
+	return count, nil
+}
+
 // ListActiveByEmployeeProfileID returns active services for an approved employee profile.
 func (r *Repository) ListActiveByEmployeeProfileID(ctx context.Context, employeeID uuid.UUID) ([]EmployeeService, error) {
 	query := `

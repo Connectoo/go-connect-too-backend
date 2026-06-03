@@ -12,6 +12,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/MustafaKheda/go-connect-too-backend/internal/config"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/admin"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/auth"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/availability"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/bookings"
@@ -19,9 +20,13 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/customers"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/kyc"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/moderation"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/payments"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/public"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/reports"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/search"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/services"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/settings"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/subscriptions"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/webhooks"
@@ -68,7 +73,8 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	authRepo := auth.NewRepository(sqlDB)
 	authSvc := auth.NewService(cfg, userRepo, registrar, authRepo, tokenManager)
 	authHandler := auth.NewHandler(authSvc, log)
-	employeeSvc := employees.NewService(employeeRepo)
+	userStatusUpdater := users.NewStatusUpdater(userRepo)
+	employeeSvc := employees.NewService(employeeRepo, userStatusUpdater)
 	employeeHandler := employees.NewHandler(employeeSvc, log)
 	kycRepo := kyc.NewRepository(sqlDB)
 	kycSvc := kyc.NewService(kyc.NewEmployeeRepositoryAdapter(employeeRepo), kycRepo)
@@ -98,10 +104,22 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	bookingRepo := bookings.NewRepository(sqlDB)
 	bookingSvc := bookings.NewService(customerRepo, employeeRepo, serviceRepo, bookingRepo, bookings.NoopEventPublisher{})
 	bookingHandler := bookings.NewHandler(bookingSvc, log)
+	adminRepo := admin.NewRepository(sqlDB)
+	adminSvc := admin.NewService(adminRepo, userRepo)
+	adminHandler := admin.NewHandler(adminSvc, log)
+	publicRepo := public.NewRepository(sqlDB)
+	publicSvc := public.NewService(categoryRepo, publicRepo, serviceRepo, employeeRepo)
+	publicHandler := public.NewHandler(publicSvc, log)
+	settingsRepo := settings.NewRepository(sqlDB)
+	settingsSvc := settings.NewService(settingsRepo)
+	settingsHandler := settings.NewHandler(settingsSvc, log)
+	moderationHandler := moderation.NewHandler(log)
+	reportsHandler := reports.NewHandler(log)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", s.healthCheck)
 		auth.RegisterRoutes(r, authHandler, tokenManager)
+		public.RegisterRoutes(r, publicHandler)
 		users.RegisterRoutes(r, userHandler, tokenManager)
 		search.RegisterRoutes(r, searchHandler)
 		employees.RegisterRoutes(r, employeeHandler, tokenManager)
@@ -113,6 +131,10 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		services.RegisterRoutes(r, serviceHandler, tokenManager)
 		availability.RegisterRoutes(r, availabilityHandler, tokenManager)
 		bookings.RegisterRoutes(r, bookingHandler, tokenManager)
+		admin.RegisterRoutes(r, adminHandler, tokenManager)
+		settings.RegisterRoutes(r, settingsHandler, tokenManager)
+		moderation.RegisterRoutes(r, moderationHandler, tokenManager)
+		reports.RegisterRoutes(r, reportsHandler, tokenManager)
 		if cfg.AppEnv != "production" {
 			registerDocsRoutes(r)
 		}

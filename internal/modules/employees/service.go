@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 )
 
 // ProfileStore loads and updates employee profiles.
@@ -16,18 +19,31 @@ type ProfileStore interface {
 	GetApprovedByID(ctx context.Context, id uuid.UUID) (*Profile, error)
 	UpdateByUserID(ctx context.Context, userID uuid.UUID, profile *Profile, at time.Time) (*Profile, error)
 	UpdateVerificationStatus(ctx context.Context, id uuid.UUID, status string, at time.Time) (*Profile, error)
+	ListAdmin(ctx context.Context, filter AdminListFilter) ([]AdminListItem, int, error)
+	GetAdminByID(ctx context.Context, id uuid.UUID) (*AdminListItem, error)
+}
+
+// UserStatusStore updates linked user account status.
+type UserStatusStore interface {
+	UpdateStatus(ctx context.Context, id uuid.UUID, status string, at time.Time) error
 }
 
 // Service handles employee profile business logic.
 type Service struct {
 	profiles ProfileStore
+	users    UserStatusStore
 	now      func() time.Time
 }
 
 // NewService creates an employee profile service.
-func NewService(profiles ProfileStore) *Service {
+func NewService(profiles ProfileStore, users ...UserStatusStore) *Service {
+	var userStore UserStatusStore
+	if len(users) > 0 {
+		userStore = users[0]
+	}
 	return &Service{
 		profiles: profiles,
+		users:    userStore,
 		now:      func() time.Time { return time.Now().UTC() },
 	}
 }
@@ -96,6 +112,60 @@ func (s *Service) RejectProfile(ctx context.Context, profileID uuid.UUID) (*Prof
 		return nil, err
 	}
 	return toProfileResponse(profile), nil
+}
+
+// ListAdmin returns paginated employee profiles for admin views.
+func (s *Service) ListAdmin(ctx context.Context, verificationStatus, query string, page pagination.Params) (pagination.Result[AdminEmployeeResponse], error) {
+	items, total, err := s.profiles.ListAdmin(ctx, AdminListFilter{
+		VerificationStatus: verificationStatus,
+		Query:              query,
+		Offset:             page.Offset(),
+		Limit:              page.Limit,
+	})
+	if err != nil {
+		return pagination.Result[AdminEmployeeResponse]{}, err
+	}
+
+	out := make([]AdminEmployeeResponse, 0, len(items))
+	for i := range items {
+		out = append(out, toAdminEmployeeResponse(&items[i]))
+	}
+	return pagination.NewResult(out, page, total), nil
+}
+
+// GetAdmin returns an employee profile with user account fields.
+func (s *Service) GetAdmin(ctx context.Context, profileID uuid.UUID) (*AdminEmployeeResponse, error) {
+	item, err := s.profiles.GetAdminByID(ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
+	res := toAdminEmployeeResponse(item)
+	return &res, nil
+}
+
+// SuspendProfile suspends the linked user account for an employee profile.
+func (s *Service) SuspendProfile(ctx context.Context, profileID uuid.UUID) (*AdminEmployeeResponse, error) {
+	if s.users == nil {
+		return nil, fmt.Errorf("%w: user status store not configured", ErrValidation)
+	}
+
+	profile, err := s.profiles.GetByID(ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.users.UpdateStatus(ctx, profile.UserID, users.StatusSuspended, s.now()); err != nil {
+		return nil, err
+	}
+	return s.GetAdmin(ctx, profileID)
+}
+
+func toAdminEmployeeResponse(item *AdminListItem) AdminEmployeeResponse {
+	return AdminEmployeeResponse{
+		ProfileResponse: *toProfileResponse(&item.Profile),
+		UserName:        item.UserName,
+		UserEmail:       item.UserEmail,
+		UserStatus:      item.UserStatus,
+	}
 }
 
 func validateUpdateProfile(req UpdateProfileRequest) error {

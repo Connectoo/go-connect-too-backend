@@ -13,6 +13,7 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/payments"
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/response"
 )
 
@@ -99,12 +100,13 @@ func (h *Handler) updatePlan(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listSubscriptions(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.ListSubscriptions(r.Context())
+	page := pagination.Parse(r.URL.Query())
+	res, err := h.svc.ListSubscriptions(r.Context(), r.URL.Query().Get("status"), page)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
-	response.JSON(w, http.StatusOK, "Subscriptions loaded", items)
+	response.JSON(w, http.StatusOK, "Subscriptions loaded", res)
 }
 
 func decodeJSON(r *http.Request, dst interface{}) error {

@@ -103,6 +103,23 @@ func (m *mockProfileStore) UpdateVerificationStatus(_ context.Context, id uuid.U
 	return &copy, nil
 }
 
+func (m *mockProfileStore) ListAdmin(_ context.Context, filter AdminListFilter) ([]AdminListItem, int, error) {
+	return []AdminListItem{}, 0, nil
+}
+
+func (m *mockProfileStore) GetAdminByID(_ context.Context, id uuid.UUID) (*AdminListItem, error) {
+	profile, ok := m.byID[id]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	return &AdminListItem{
+		Profile:    *profile,
+		UserName:   "Test User",
+		UserEmail:  "test@example.com",
+		UserStatus: "active",
+	}, nil
+}
+
 func newTestService(t *testing.T, store ProfileStore) *Service {
 	t.Helper()
 	svc := NewService(store)

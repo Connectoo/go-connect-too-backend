@@ -14,6 +14,7 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/customers"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/services"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 )
 
 const maxNotesLength = 1000
@@ -32,6 +33,11 @@ type EmployeeProfileStore interface {
 // ServiceCatalog loads bookable services.
 type ServiceCatalog interface {
 	GetPublicActiveByID(ctx context.Context, serviceID uuid.UUID) (*services.EmployeeService, error)
+}
+
+// AdminStore supports paginated admin booking listings.
+type AdminStore interface {
+	ListAdmin(ctx context.Context, filter AdminListFilter) ([]Booking, int, error)
 }
 
 // Store persists bookings.
@@ -262,13 +268,26 @@ func (s *Service) Complete(ctx context.Context, userID, bookingID uuid.UUID, req
 	return s.employeeTransition(ctx, userID, bookingID, StatusCompleted, ActionEmployeeComplete, req)
 }
 
-// ListForAdmin returns all bookings.
-func (s *Service) ListForAdmin(ctx context.Context) ([]BookingResponse, error) {
-	items, err := s.store.ListAll(ctx)
-	if err != nil {
-		return nil, err
+// ListForAdmin returns paginated bookings for admin views.
+func (s *Service) ListForAdmin(ctx context.Context, status string, page pagination.Params) (pagination.Result[BookingResponse], error) {
+	adminStore, ok := s.store.(AdminStore)
+	if !ok {
+		items, err := s.store.ListAll(ctx)
+		if err != nil {
+			return pagination.Result[BookingResponse]{}, err
+		}
+		return pagination.NewResult(toResponseList(items), page, len(items)), nil
 	}
-	return toResponseList(items), nil
+
+	items, total, err := adminStore.ListAdmin(ctx, AdminListFilter{
+		Status: status,
+		Offset: page.Offset(),
+		Limit:  page.Limit,
+	})
+	if err != nil {
+		return pagination.Result[BookingResponse]{}, err
+	}
+	return pagination.NewResult(toResponseList(items), page, total), nil
 }
 
 // GetForAdmin returns a booking by id.

@@ -11,6 +11,7 @@ import (
 
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/response"
 )
 
@@ -190,6 +191,51 @@ func (h *Handler) updateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.JSON(w, http.StatusOK, "Service status updated", res)
+}
+
+func (h *Handler) listAdmin(w http.ResponseWriter, r *http.Request) {
+	page := pagination.Parse(r.URL.Query())
+	query := r.URL.Query()
+	res, err := h.svc.ListForAdmin(
+		r.Context(),
+		ParseOptionalUUID(query.Get("category_id")),
+		ParseOptionalBool(query.Get("is_active")),
+		query.Get("q"),
+		page,
+	)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Services loaded", res)
+}
+
+func (h *Handler) activateAdmin(w http.ResponseWriter, r *http.Request) {
+	h.adminSetStatus(w, r, true, "Service activated")
+}
+
+func (h *Handler) deactivateAdmin(w http.ResponseWriter, r *http.Request) {
+	h.adminSetStatus(w, r, false, "Service deactivated")
+}
+
+func (h *Handler) adminSetStatus(w http.ResponseWriter, r *http.Request, active bool, message string) {
+	serviceID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid service id", sharederrors.CodeValidationError)
+		return
+	}
+
+	var res *ServiceResponse
+	if active {
+		res, err = h.svc.AdminActivate(r.Context(), serviceID)
+	} else {
+		res, err = h.svc.AdminDeactivate(r.Context(), serviceID)
+	}
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, message, res)
 }
 
 func decodeJSON(r *http.Request, dst interface{}) error {

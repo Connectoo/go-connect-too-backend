@@ -16,6 +16,9 @@ const maxNameLength = 100
 type CategoryStore interface {
 	ListActive(ctx context.Context) ([]Category, error)
 	Create(ctx context.Context, category *Category) (*Category, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*Category, error)
+	Update(ctx context.Context, id uuid.UUID, category *Category, at time.Time) (*Category, error)
+	Delete(ctx context.Context, id uuid.UUID, at time.Time) error
 }
 
 // Service handles category business logic.
@@ -72,6 +75,37 @@ func (s *Service) CreateCategory(ctx context.Context, req CreateCategoryRequest)
 	}
 
 	return toCategoryResponse(created), nil
+}
+
+// UpdateCategory updates a category (admin).
+func (s *Service) UpdateCategory(ctx context.Context, id uuid.UUID, req UpdateCategoryRequest) (*CategoryResponse, error) {
+	name, description, err := validateCreateCategory(CreateCategoryRequest{
+		Name:        req.Name,
+		Description: req.Description,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
+	updated, err := s.categories.Update(ctx, id, &Category{
+		Name:        name,
+		Description: description,
+		IsActive:    isActive,
+	}, s.now())
+	if err != nil {
+		return nil, err
+	}
+	return toCategoryResponse(updated), nil
+}
+
+// DeleteCategory soft-deactivates a category (admin).
+func (s *Service) DeleteCategory(ctx context.Context, id uuid.UUID) error {
+	return s.categories.Delete(ctx, id, s.now())
 }
 
 func validateCreateCategory(req CreateCategoryRequest) (string, *string, error) {

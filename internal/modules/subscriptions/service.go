@@ -11,12 +11,17 @@ import (
 
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/payments"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 )
 
 const maxPlanNameLength = 100
 
 type EmployeeProfileStore interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*employees.Profile, error)
+}
+
+type AdminStore interface {
+	ListAdmin(ctx context.Context, filter AdminListFilter) ([]EmployeeSubscription, int, error)
 }
 
 type Store interface {
@@ -115,16 +120,32 @@ func (s *Service) UpdatePlan(ctx context.Context, id uuid.UUID, req UpdatePlanRe
 	return toPlanResponse(updated), nil
 }
 
-func (s *Service) ListSubscriptions(ctx context.Context) ([]SubscriptionResponse, error) {
+func (s *Service) ListSubscriptions(ctx context.Context, status string, page pagination.Params) (pagination.Result[SubscriptionResponse], error) {
+	if adminStore, ok := s.store.(AdminStore); ok {
+		items, total, err := adminStore.ListAdmin(ctx, AdminListFilter{
+			Status: status,
+			Offset: page.Offset(),
+			Limit:  page.Limit,
+		})
+		if err != nil {
+			return pagination.Result[SubscriptionResponse]{}, err
+		}
+		out := make([]SubscriptionResponse, 0, len(items))
+		for i := range items {
+			out = append(out, *toSubscriptionResponse(&items[i]))
+		}
+		return pagination.NewResult(out, page, total), nil
+	}
+
 	items, err := s.store.ListAllSubscriptions(ctx)
 	if err != nil {
-		return nil, err
+		return pagination.Result[SubscriptionResponse]{}, err
 	}
 	out := make([]SubscriptionResponse, 0, len(items))
 	for i := range items {
 		out = append(out, *toSubscriptionResponse(&items[i]))
 	}
-	return out, nil
+	return pagination.NewResult(out, page, len(out)), nil
 }
 
 func validatePlanRequest(req CreatePlanRequest) (*Plan, error) {

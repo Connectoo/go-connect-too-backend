@@ -24,4 +24,13 @@ func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
 		r.Delete("/employee/services/{id}", h.delete)
 		r.Patch("/employee/services/{id}/status", h.updateStatus)
 	})
+
+	r.Route("/admin/services", func(r chi.Router) {
+		r.Use(middleware.Authenticate(tokens))
+		r.Use(middleware.RequireRole(users.RoleAdmin))
+
+		r.Get("/", h.listAdmin)
+		r.Patch("/{id}/activate", h.activateAdmin)
+		r.Patch("/{id}/deactivate", h.deactivateAdmin)
+	})
 }

@@ -46,6 +46,56 @@ func (m *mockCategoryStore) Create(_ context.Context, category *Category) (*Cate
 	return &copy, nil
 }
 
+func (m *mockCategoryStore) GetByID(_ context.Context, id uuid.UUID) (*Category, error) {
+	for _, category := range m.active {
+		if category.ID == id {
+			copy := category
+			return &copy, nil
+		}
+	}
+	for _, category := range m.byName {
+		if category.ID == id {
+			copy := *category
+			return &copy, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
+func (m *mockCategoryStore) Update(_ context.Context, id uuid.UUID, category *Category, at time.Time) (*Category, error) {
+	existing, err := m.GetByID(context.Background(), id)
+	if err != nil {
+		return nil, err
+	}
+	updated := *existing
+	updated.Name = category.Name
+	updated.Description = category.Description
+	updated.IsActive = category.IsActive
+	updated.UpdatedAt = at
+	m.byName[strings.ToLower(updated.Name)] = &updated
+	return &updated, nil
+}
+
+func (m *mockCategoryStore) Delete(_ context.Context, id uuid.UUID, at time.Time) error {
+	existing, err := m.GetByID(context.Background(), id)
+	if err != nil {
+		return err
+	}
+	existing.IsActive = false
+	existing.UpdatedAt = at
+	return nil
+}
+
+func (m *mockCategoryStore) CountActive(_ context.Context) (int, error) {
+	count := 0
+	for _, category := range m.active {
+		if category.IsActive {
+			count++
+		}
+	}
+	return count, nil
+}
+
 func TestService_ListActive(t *testing.T) {
 	store := newMockCategoryStore()
 	store.active = []Category{

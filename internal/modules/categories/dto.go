@@ -9,6 +9,13 @@ type CreateCategoryRequest struct {
 	IsActive    *bool   `json:"is_active,omitempty"`
 }
 
+// UpdateCategoryRequest replaces a category (admin).
+type UpdateCategoryRequest struct {
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	IsActive    *bool   `json:"is_active,omitempty"`
+}
+
 // CategoryResponse is the public category payload.
 type CategoryResponse struct {
 	ID          uuid.UUID `json:"id"`
