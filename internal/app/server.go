@@ -13,6 +13,7 @@ import (
 
 	"github.com/MustafaKheda/go-connect-too-backend/internal/config"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/admin"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/analytics"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/auth"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/availability"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/badges"
@@ -84,8 +85,12 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	userStatusUpdater := users.NewStatusUpdater(userRepo)
 	badgeRepo := badges.NewRepository(sqlDB)
 	badgeSvc := badges.NewService(badgeRepo)
-	employeeSvc := employees.NewService(employeeRepo, userStatusUpdater).WithBadges(badgeSvc)
+	employeeSvc := employees.NewService(employeeRepo, userStatusUpdater)
+	analyticsRepo := analytics.NewRepository(sqlDB)
+	analyticsSvc := analytics.NewService(analyticsRepo, employeeRepo)
+	employeeSvc = employeeSvc.WithBadges(badgeSvc).WithProfileViews(analyticsSvc)
 	employeeHandler := employees.NewHandler(employeeSvc, log)
+	analyticsHandler := analytics.NewHandler(analyticsSvc, log)
 	kycRepo := kyc.NewRepository(sqlDB)
 	kycSvc := kyc.NewService(kyc.NewEmployeeRepositoryAdapter(employeeRepo), kycRepo)
 	kycHandler := kyc.NewHandler(kycSvc, log)
@@ -148,7 +153,7 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	adminSvc := admin.NewService(adminRepo, userRepo)
 	adminHandler := admin.NewHandler(adminSvc, log)
 	publicRepo := public.NewRepository(sqlDB)
-	publicSvc := public.NewService(categoryRepo, publicRepo, serviceRepo, employeeRepo)
+	publicSvc := public.NewService(categoryRepo, publicRepo, serviceRepo, employeeRepo).WithProfileViews(analyticsSvc)
 	publicHandler := public.NewHandler(publicSvc, log)
 	settingsRepo := settings.NewRepository(sqlDB)
 	settingsSvc := settings.NewService(settingsRepo)
@@ -174,6 +179,7 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		chat.RegisterRoutes(r, chatHandler, tokenManager)
 		ws.RegisterRoutes(r, wsHandler)
 		admin.RegisterRoutes(r, adminHandler, tokenManager)
+		analytics.RegisterRoutes(r, analyticsHandler, tokenManager)
 		settings.RegisterRoutes(r, settingsHandler, tokenManager)
 		moderation.RegisterRoutes(r, moderationHandler, tokenManager)
 		reports.RegisterRoutes(r, reportHandler, tokenManager)

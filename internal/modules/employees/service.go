@@ -17,6 +17,11 @@ type BadgeReader interface {
 	ListForEmployee(ctx context.Context, employeeID uuid.UUID) ([]string, error)
 }
 
+// ProfileViewRecorder records public profile view events for analytics.
+type ProfileViewRecorder interface {
+	RecordProfileView(ctx context.Context, employeeID uuid.UUID)
+}
+
 // ProfileStore loads and updates employee profiles.
 type ProfileStore interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*Profile, error)
@@ -35,10 +40,11 @@ type UserStatusStore interface {
 
 // Service handles employee profile business logic.
 type Service struct {
-	profiles ProfileStore
-	users    UserStatusStore
-	badges   BadgeReader
-	now      func() time.Time
+	profiles     ProfileStore
+	users        UserStatusStore
+	badges       BadgeReader
+	profileViews ProfileViewRecorder
+	now          func() time.Time
 }
 
 // NewService creates an employee profile service.
@@ -60,6 +66,12 @@ func (s *Service) WithBadges(badges BadgeReader) *Service {
 	return s
 }
 
+// WithProfileViews configures analytics profile view recording.
+func (s *Service) WithProfileViews(recorder ProfileViewRecorder) *Service {
+	s.profileViews = recorder
+	return s
+}
+
 // GetPublicProfile returns an approved employee profile for marketplace browsing.
 func (s *Service) GetPublicProfile(ctx context.Context, profileID uuid.UUID) (*PublicProfileResponse, error) {
 	profile, err := s.profiles.GetApprovedByID(ctx, profileID)
@@ -73,6 +85,9 @@ func (s *Service) GetPublicProfile(ctx context.Context, profileID uuid.UUID) (*P
 			return nil, err
 		}
 		res.Badges = badges
+	}
+	if s.profileViews != nil {
+		s.profileViews.RecordProfileView(ctx, profileID)
 	}
 	return res, nil
 }

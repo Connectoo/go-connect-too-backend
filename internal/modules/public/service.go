@@ -37,10 +37,11 @@ type EmployeeReader interface {
 
 // Service handles public website business logic.
 type Service struct {
-	categories CategoryReader
-	providers  ProviderReader
-	services   ServiceReader
-	employees  EmployeeReader
+	categories   CategoryReader
+	providers    ProviderReader
+	services     ServiceReader
+	employees    EmployeeReader
+	profileViews employees.ProfileViewRecorder
 }
 
 // NewService creates a public website service.
@@ -56,6 +57,12 @@ func NewService(
 		services:   services,
 		employees:  employees,
 	}
+}
+
+// WithProfileViews configures analytics profile view recording.
+func (s *Service) WithProfileViews(recorder employees.ProfileViewRecorder) *Service {
+	s.profileViews = recorder
+	return s
 }
 
 // GetHome returns homepage content for the public website.
@@ -149,6 +156,9 @@ func (s *Service) GetProvider(ctx context.Context, providerID uuid.UUID) (*Provi
 		return nil, err
 	}
 	res := toProviderResponse(profile)
+	if s.profileViews != nil {
+		s.profileViews.RecordProfileView(ctx, providerID)
+	}
 	return &res, nil
 }
 

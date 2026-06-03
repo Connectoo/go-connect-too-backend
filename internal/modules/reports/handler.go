@@ -44,6 +44,13 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusCreated, "Report submitted", res)
 }
 
+func (h *Handler) exportPlaceholder(w http.ResponseWriter, r *http.Request) {
+	response.JSON(w, http.StatusOK, "Export not available yet", map[string]string{
+		"status":  "placeholder",
+		"message": "CSV and PDF exports will be added in a later phase",
+	})
+}
+
 func decodeJSON(r *http.Request, dst interface{}) error {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
