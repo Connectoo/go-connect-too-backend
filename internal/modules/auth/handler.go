@@ -64,6 +64,10 @@ func (h *Handler) loginEmployee(w http.ResponseWriter, r *http.Request) {
 	h.login(w, r, "Employee", h.svc.LoginEmployee)
 }
 
+func (h *Handler) loginAdmin(w http.ResponseWriter, r *http.Request) {
+	h.login(w, r, "Admin", h.svc.LoginAdmin)
+}
+
 func (h *Handler) login(w http.ResponseWriter, r *http.Request, label string, fn func(context.Context, LoginRequest) (*AuthResponse, error)) {
 	var req LoginRequest
 	if err := decodeJSON(r, &req); err != nil {

@@ -123,6 +123,11 @@ func (s *Service) LoginEmployee(ctx context.Context, req LoginRequest) (*AuthRes
 	return s.login(ctx, req, users.RoleEmployee)
 }
 
+// LoginAdmin authenticates an admin account.
+func (s *Service) LoginAdmin(ctx context.Context, req LoginRequest) (*AuthResponse, error) {
+	return s.login(ctx, req, users.RoleAdmin)
+}
+
 func (s *Service) login(ctx context.Context, req LoginRequest, role string) (*AuthResponse, error) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	if email == "" || req.Password == "" {

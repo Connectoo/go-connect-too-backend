@@ -14,6 +14,7 @@ func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
 		r.Post("/register/employee", h.registerEmployee)
 		r.Post("/login/customer", h.loginCustomer)
 		r.Post("/login/employee", h.loginEmployee)
+		r.Post("/login/admin", h.loginAdmin)
 		r.Post("/refresh", h.refresh)
 		r.Post("/logout", h.logout)
 
