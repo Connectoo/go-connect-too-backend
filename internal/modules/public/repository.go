@@ -23,7 +23,7 @@ func NewRepository(db *sql.DB) *Repository {
 const publicProviderColumns = `
 	ep.id, ep.display_name, ep.bio, ep.experience_years, ep.profile_photo_url,
 	ep.location_text, ep.latitude, ep.longitude, ep.service_area_radius_km,
-	ep.languages, ep.skills`
+	ep.languages, ep.skills, ep.average_rating, ep.total_reviews`
 
 // ListApprovedProviders returns approved employee profiles for the public website.
 func (r *Repository) ListApprovedProviders(ctx context.Context, limit int) ([]employees.Profile, error) {
@@ -101,6 +101,8 @@ func scanPublicProvider(row rowScanner) (*employees.Profile, error) {
 		&profile.ServiceAreaRadiusKm,
 		&languages,
 		&skills,
+		&profile.AverageRating,
+		&profile.TotalReviews,
 	)
 	if err != nil {
 		return nil, err

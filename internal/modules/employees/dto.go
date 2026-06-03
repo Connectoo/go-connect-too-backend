@@ -51,6 +51,8 @@ type PublicProfileResponse struct {
 	Languages           []string  `json:"languages"`
 	Skills              []string  `json:"skills"`
 	Rating              *float64  `json:"rating,omitempty"`
+	TotalReviews        int       `json:"total_reviews"`
+	Badges              []string  `json:"badges,omitempty"`
 }
 
 // AdminEmployeeResponse is an employee profile with linked user account fields.

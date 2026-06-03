@@ -28,6 +28,8 @@ type Profile struct {
 	Languages           []string
 	Skills              []string
 	VerificationStatus  string
+	AverageRating       *float64
+	TotalReviews        int
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }

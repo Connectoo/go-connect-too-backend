@@ -24,7 +24,7 @@ func NewRepository(db *sql.DB) *Repository {
 const profileColumns = `
 	id, user_id, display_name, phone, bio, experience_years, profile_photo_url,
 	location_text, latitude, longitude, service_area_radius_km, languages, skills,
-	verification_status, created_at, updated_at`
+	verification_status, average_rating, total_reviews, created_at, updated_at`
 
 // CreateForUserInTx inserts a profile row for a newly registered employee user.
 func (r *Repository) CreateForUserInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, at time.Time) error {
@@ -178,6 +178,8 @@ func scanProfile(row rowScanner) (*Profile, error) {
 		&languages,
 		&skills,
 		&profile.VerificationStatus,
+		&profile.AverageRating,
+		&profile.TotalReviews,
 		&profile.CreatedAt,
 		&profile.UpdatedAt,
 	)

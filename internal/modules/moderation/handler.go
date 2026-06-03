@@ -1,39 +1,130 @@
 package moderation
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/reports"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/reviews"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
+	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/response"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/security"
 )
 
-// Handler serves moderation placeholder endpoints.
-type Handler struct {
-	log *slog.Logger
+func (h *Handler) listReviews(w http.ResponseWriter, r *http.Request) {
+	page := pagination.Parse(r.URL.Query())
+	res, err := h.svc.Reviews().ListForAdmin(r.Context(), r.URL.Query().Get("status"), page)
+	if err != nil {
+		h.writeReviewError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Reviews loaded", res)
 }
 
-// NewHandler creates a moderation handler.
-func NewHandler(log *slog.Logger) *Handler {
-	return &Handler{log: log}
+func (h *Handler) approveReview(w http.ResponseWriter, r *http.Request) {
+	reviewID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid review id", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.Reviews().Approve(r.Context(), reviewID)
+	if err != nil {
+		h.writeReviewError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Review approved", res)
 }
 
-func (h *Handler) status(w http.ResponseWriter, _ *http.Request) {
-	response.JSON(w, http.StatusOK, "Moderation module placeholder", map[string]string{
-		"status":  "not_implemented",
-		"message": "Moderation workflows will be added in a later phase",
-	})
+func (h *Handler) hideReview(w http.ResponseWriter, r *http.Request) {
+	reviewID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid review id", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.Reviews().Hide(r.Context(), reviewID)
+	if err != nil {
+		h.writeReviewError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Review hidden", res)
 }
 
-// RegisterRoutes mounts moderation placeholder endpoints.
+func (h *Handler) listReports(w http.ResponseWriter, r *http.Request) {
+	page := pagination.Parse(r.URL.Query())
+	res, err := h.svc.Reports().ListForAdmin(r.Context(), r.URL.Query().Get("status"), page)
+	if err != nil {
+		h.writeReportError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Reports loaded", res)
+}
+
+func (h *Handler) resolveReport(w http.ResponseWriter, r *http.Request) {
+	reportID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid report id", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.Reports().Resolve(r.Context(), reportID)
+	if err != nil {
+		h.writeReportError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Report resolved", res)
+}
+
+func (h *Handler) writeReviewError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, reviews.ErrNotFound):
+		response.Error(w, http.StatusNotFound, "Review not found", sharederrors.CodeNotFound)
+	case errors.Is(err, reviews.ErrInvalidStatus):
+		response.Error(w, http.StatusConflict, "Review cannot be approved", sharederrors.CodeConflict)
+	default:
+		if h.log != nil {
+			h.log.Error("moderation review request failed", slog.String("error", err.Error()))
+		}
+		response.Error(w, http.StatusInternalServerError, "Something went wrong", sharederrors.CodeInternalError)
+	}
+}
+
+func (h *Handler) writeReportError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, reports.ErrNotFound):
+		response.Error(w, http.StatusNotFound, "Report not found", sharederrors.CodeNotFound)
+	default:
+		if h.log != nil {
+			h.log.Error("moderation report request failed", slog.String("error", err.Error()))
+		}
+		response.Error(w, http.StatusInternalServerError, "Something went wrong", sharederrors.CodeInternalError)
+	}
+}
+
+// RegisterRoutes mounts admin moderation endpoints.
 func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
-	r.Route("/admin/moderation", func(r chi.Router) {
+	r.Route("/admin/reviews", func(r chi.Router) {
 		r.Use(middleware.Authenticate(tokens))
 		r.Use(middleware.RequireRole(users.RoleAdmin))
-		r.Get("/", h.status)
+
+		r.Get("/", h.listReviews)
+		r.Patch("/{id}/approve", h.approveReview)
+		r.Patch("/{id}/hide", h.hideReview)
+	})
+
+	r.Route("/admin/reports", func(r chi.Router) {
+		r.Use(middleware.Authenticate(tokens))
+		r.Use(middleware.RequireRole(users.RoleAdmin))
+
+		r.Get("/", h.listReports)
+		r.Patch("/{id}/resolve", h.resolveReport)
 	})
 }

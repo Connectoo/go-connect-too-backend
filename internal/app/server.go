@@ -15,6 +15,7 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/admin"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/auth"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/availability"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/badges"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/bookings"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/categories"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/chat"
@@ -26,7 +27,9 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/notifications"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/payments"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/public"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/ratings"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/reports"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/reviews"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/search"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/services"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/settings"
@@ -79,7 +82,9 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	authSvc := auth.NewService(cfg, userRepo, registrar, authRepo, tokenManager)
 	authHandler := auth.NewHandler(authSvc, log)
 	userStatusUpdater := users.NewStatusUpdater(userRepo)
-	employeeSvc := employees.NewService(employeeRepo, userStatusUpdater)
+	badgeRepo := badges.NewRepository(sqlDB)
+	badgeSvc := badges.NewService(badgeRepo)
+	employeeSvc := employees.NewService(employeeRepo, userStatusUpdater).WithBadges(badgeSvc)
 	employeeHandler := employees.NewHandler(employeeSvc, log)
 	kycRepo := kyc.NewRepository(sqlDB)
 	kycSvc := kyc.NewService(kyc.NewEmployeeRepositoryAdapter(employeeRepo), kycRepo)
@@ -129,6 +134,16 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	bookingRepo := bookings.NewRepository(sqlDB)
 	bookingSvc := bookings.NewService(customerRepo, employeeRepo, serviceRepo, bookingRepo, bookingPublisher)
 	bookingHandler := bookings.NewHandler(bookingSvc, log)
+	ratingRepo := ratings.NewRepository(sqlDB)
+	ratingSvc := ratings.NewService(ratingRepo)
+	reviewRepo := reviews.NewRepository(sqlDB)
+	reviewSvc := reviews.NewService(customerRepo, employeeRepo, bookingRepo, reviewRepo, badgeSvc, ratings.NewRefresher(ratingSvc))
+	reviewHandler := reviews.NewHandler(reviewSvc, log)
+	reportRepo := reports.NewRepository(sqlDB)
+	reportSvc := reports.NewService(bookingRepo, reportRepo)
+	reportHandler := reports.NewHandler(reportSvc, log)
+	moderationSvc := moderation.NewService(reviewSvc, reportSvc)
+	moderationHandler := moderation.NewHandler(moderationSvc, log)
 	adminRepo := admin.NewRepository(sqlDB)
 	adminSvc := admin.NewService(adminRepo, userRepo)
 	adminHandler := admin.NewHandler(adminSvc, log)
@@ -138,8 +153,6 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	settingsRepo := settings.NewRepository(sqlDB)
 	settingsSvc := settings.NewService(settingsRepo)
 	settingsHandler := settings.NewHandler(settingsSvc, log)
-	moderationHandler := moderation.NewHandler(log)
-	reportsHandler := reports.NewHandler(log)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", s.healthCheck)
@@ -156,13 +169,14 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		services.RegisterRoutes(r, serviceHandler, tokenManager)
 		availability.RegisterRoutes(r, availabilityHandler, tokenManager)
 		bookings.RegisterRoutes(r, bookingHandler, tokenManager)
+		reviews.RegisterRoutes(r, reviewHandler, tokenManager)
 		notifications.RegisterRoutes(r, notificationHandler, tokenManager)
 		chat.RegisterRoutes(r, chatHandler, tokenManager)
 		ws.RegisterRoutes(r, wsHandler)
 		admin.RegisterRoutes(r, adminHandler, tokenManager)
 		settings.RegisterRoutes(r, settingsHandler, tokenManager)
 		moderation.RegisterRoutes(r, moderationHandler, tokenManager)
-		reports.RegisterRoutes(r, reportsHandler, tokenManager)
+		reports.RegisterRoutes(r, reportHandler, tokenManager)
 		if cfg.AppEnv != "production" {
 			registerDocsRoutes(r)
 		}

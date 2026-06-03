@@ -198,7 +198,8 @@ func toProviderResponse(profile *employees.Profile) ProviderResponse {
 		ServiceAreaRadiusKm: profile.ServiceAreaRadiusKm,
 		Languages:           profile.Languages,
 		Skills:              profile.Skills,
-		Rating:              nil,
+		Rating:              profile.AverageRating,
+		TotalReviews:        profile.TotalReviews,
 	}
 }
 

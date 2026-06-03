@@ -12,6 +12,11 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 )
 
+// BadgeReader loads trust badges for public profiles.
+type BadgeReader interface {
+	ListForEmployee(ctx context.Context, employeeID uuid.UUID) ([]string, error)
+}
+
 // ProfileStore loads and updates employee profiles.
 type ProfileStore interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*Profile, error)
@@ -32,6 +37,7 @@ type UserStatusStore interface {
 type Service struct {
 	profiles ProfileStore
 	users    UserStatusStore
+	badges   BadgeReader
 	now      func() time.Time
 }
 
@@ -48,13 +54,27 @@ func NewService(profiles ProfileStore, users ...UserStatusStore) *Service {
 	}
 }
 
+// WithBadges configures badge loading for public profiles.
+func (s *Service) WithBadges(badges BadgeReader) *Service {
+	s.badges = badges
+	return s
+}
+
 // GetPublicProfile returns an approved employee profile for marketplace browsing.
 func (s *Service) GetPublicProfile(ctx context.Context, profileID uuid.UUID) (*PublicProfileResponse, error) {
 	profile, err := s.profiles.GetApprovedByID(ctx, profileID)
 	if err != nil {
 		return nil, err
 	}
-	return toPublicProfileResponse(profile), nil
+	res := toPublicProfileResponse(profile)
+	if s.badges != nil {
+		badges, err := s.badges.ListForEmployee(ctx, profileID)
+		if err != nil {
+			return nil, err
+		}
+		res.Badges = badges
+	}
+	return res, nil
 }
 
 // GetProfile returns the authenticated employee's profile.
@@ -232,7 +252,8 @@ func toPublicProfileResponse(profile *Profile) *PublicProfileResponse {
 		ServiceAreaRadiusKm: profile.ServiceAreaRadiusKm,
 		Languages:           profile.Languages,
 		Skills:              profile.Skills,
-		Rating:              nil,
+		Rating:              profile.AverageRating,
+		TotalReviews:        profile.TotalReviews,
 	}
 }
 
