@@ -12,4 +12,5 @@ var (
 	ErrDoubleBooking           = errors.New("double booking")
 	ErrInvalidStatusTransition = errors.New("invalid status transition")
 	ErrCustomerProfileNotFound = errors.New("customer profile not found")
+	ErrRebookNotAllowed        = errors.New("booking cannot be rebooked")
 )

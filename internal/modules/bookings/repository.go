@@ -26,7 +26,7 @@ func NewRepository(db *sql.DB) *Repository {
 
 const bookingColumns = `
 	id, customer_id, employee_id, service_id, booking_date, start_time, end_time,
-	status, customer_notes, employee_notes, total_amount, created_at, updated_at`
+	status, customer_notes, employee_notes, total_amount, source_booking_id, created_at, updated_at`
 
 // Create inserts a booking and its initial status history inside a transaction.
 func (r *Repository) Create(ctx context.Context, booking *Booking, changedByUserID uuid.UUID) (*Booking, error) {
@@ -212,9 +212,9 @@ func insertBookingInTx(ctx context.Context, tx *sql.Tx, booking *Booking) (*Book
 	query := `
 		INSERT INTO bookings (
 			id, customer_id, employee_id, service_id, booking_date, start_time, end_time,
-			status, customer_notes, employee_notes, total_amount, created_at, updated_at
+			status, customer_notes, employee_notes, total_amount, source_booking_id, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING` + bookingColumns
 
 	row := tx.QueryRowContext(ctx, query,
@@ -229,6 +229,7 @@ func insertBookingInTx(ctx context.Context, tx *sql.Tx, booking *Booking) (*Book
 		booking.CustomerNotes,
 		booking.EmployeeNotes,
 		booking.TotalAmount,
+		booking.SourceBookingID,
 		booking.CreatedAt,
 		booking.UpdatedAt,
 	)
@@ -336,6 +337,7 @@ func scanBooking(row rowScanner) (*Booking, error) {
 		&booking.CustomerNotes,
 		&booking.EmployeeNotes,
 		&booking.TotalAmount,
+		&booking.SourceBookingID,
 		&booking.CreatedAt,
 		&booking.UpdatedAt,
 	)

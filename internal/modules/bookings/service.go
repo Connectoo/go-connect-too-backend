@@ -91,7 +91,94 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateBookin
 		}
 		return nil, err
 	}
+	return s.createBooking(ctx, userID, customer, req, nil)
+}
 
+// RebookPreview returns hints for rebooking a prior booking owned by the customer.
+func (s *Service) RebookPreview(ctx context.Context, userID, sourceBookingID uuid.UUID) (*RebookPreviewResponse, error) {
+	source, _, err := s.loadRebookSource(ctx, userID, sourceBookingID)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceAvailable := false
+	employeeAvailable := false
+	var currentPrice *float64
+
+	if service, err := s.services.GetPublicActiveByID(ctx, source.ServiceID); err == nil {
+		serviceAvailable = true
+		price := service.Price
+		currentPrice = &price
+		if _, err := s.employees.GetApprovedByID(ctx, service.EmployeeID); err == nil {
+			employeeAvailable = true
+		}
+	}
+
+	return &RebookPreviewResponse{
+		SourceBookingID:   source.ID,
+		SourceStatus:      source.Status,
+		ServiceID:         source.ServiceID,
+		EmployeeID:        source.EmployeeID,
+		ServiceAvailable:  serviceAvailable,
+		EmployeeAvailable: employeeAvailable,
+		CanRebook:         serviceAvailable && employeeAvailable,
+		CurrentPrice:      currentPrice,
+		SuggestedDate:     source.BookingDate.Format("2006-01-02"),
+		SuggestedStart:    source.StartTime.String(),
+		SuggestedEnd:      source.EndTime.String(),
+	}, nil
+}
+
+// Rebook creates a new booking from a completed or cancelled prior booking.
+func (s *Service) Rebook(ctx context.Context, userID uuid.UUID, req RebookBookingRequest) (*BookingResponse, error) {
+	if req.SourceBookingID == uuid.Nil {
+		return nil, fmt.Errorf("%w: source_booking_id is required", ErrValidation)
+	}
+
+	source, customer, err := s.loadRebookSource(ctx, userID, req.SourceBookingID)
+	if err != nil {
+		return nil, err
+	}
+
+	createReq := CreateBookingRequest{
+		ServiceID:     source.ServiceID,
+		BookingDate:   req.BookingDate,
+		StartTime:     req.StartTime,
+		EndTime:       req.EndTime,
+		CustomerNotes: req.CustomerNotes,
+	}
+	return s.createBooking(ctx, userID, customer, createReq, &source.ID)
+}
+
+func (s *Service) loadRebookSource(ctx context.Context, userID, sourceBookingID uuid.UUID) (*Booking, *customers.Profile, error) {
+	customer, err := s.customers.GetByUserID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, customers.ErrNotFound) {
+			return nil, nil, ErrCustomerProfileNotFound
+		}
+		return nil, nil, err
+	}
+
+	source, err := s.store.GetByID(ctx, sourceBookingID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if source.CustomerID != customer.ID {
+		return nil, nil, ErrForbidden
+	}
+	if !isRebookEligibleStatus(source.Status) {
+		return nil, nil, fmt.Errorf("%w: booking status is %s", ErrRebookNotAllowed, source.Status)
+	}
+	return source, customer, nil
+}
+
+func (s *Service) createBooking(
+	ctx context.Context,
+	userID uuid.UUID,
+	customer *customers.Profile,
+	req CreateBookingRequest,
+	sourceBookingID *uuid.UUID,
+) (*BookingResponse, error) {
 	service, err := s.services.GetPublicActiveByID(ctx, req.ServiceID)
 	if err != nil {
 		if errors.Is(err, services.ErrNotFound) {
@@ -125,18 +212,19 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateBookin
 
 	at := s.now()
 	booking := &Booking{
-		ID:            uuid.New(),
-		CustomerID:    customer.ID,
-		EmployeeID:    service.EmployeeID,
-		ServiceID:     service.ID,
-		BookingDate:   bookingDate,
-		StartTime:     start,
-		EndTime:       end,
-		Status:        StatusPending,
-		CustomerNotes: customerNotes,
-		TotalAmount:   service.Price,
-		CreatedAt:     at,
-		UpdatedAt:     at,
+		ID:              uuid.New(),
+		CustomerID:      customer.ID,
+		EmployeeID:      service.EmployeeID,
+		ServiceID:       service.ID,
+		BookingDate:     bookingDate,
+		StartTime:       start,
+		EndTime:         end,
+		Status:          StatusPending,
+		CustomerNotes:   customerNotes,
+		TotalAmount:     service.Price,
+		SourceBookingID: sourceBookingID,
+		CreatedAt:       at,
+		UpdatedAt:       at,
 	}
 
 	created, err := s.store.Create(ctx, booking, userID)
@@ -156,6 +244,15 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateBookin
 	})
 
 	return toResponse(created), nil
+}
+
+func isRebookEligibleStatus(status string) bool {
+	switch status {
+	case StatusCompleted, StatusCancelled, StatusRejected, StatusNoShow:
+		return true
+	default:
+		return false
+	}
 }
 
 // ListForCustomer returns bookings owned by the authenticated customer.

@@ -366,3 +366,156 @@ func TestUnauthorizedEmployeeAccept(t *testing.T) {
 func strPtr(value string) *string {
 	return &value
 }
+
+func TestRebookPreviewSuccess(t *testing.T) {
+	customerUserID := uuid.New()
+	customerID := uuid.New()
+	employeeID := uuid.New()
+	serviceID := uuid.New()
+	sourceBookingID := uuid.New()
+
+	store := newMockBookingStore()
+	store.bookings[sourceBookingID] = &Booking{
+		ID:          sourceBookingID,
+		CustomerID:  customerID,
+		EmployeeID:  employeeID,
+		ServiceID:   serviceID,
+		Status:      StatusCompleted,
+		BookingDate: time.Date(2026, 5, 20, 0, 0, 0, 0, time.UTC),
+		StartTime:   availability.TimeOfDay{Hour: 9, Minute: 0},
+		EndTime:     availability.TimeOfDay{Hour: 10, Minute: 0},
+	}
+
+	svc := newTestService(t,
+		&mockCustomerStore{byUserID: map[uuid.UUID]*customers.Profile{
+			customerUserID: {ID: customerID, UserID: customerUserID},
+		}},
+		&mockEmployeeStore{approvedID: map[uuid.UUID]*employees.Profile{
+			employeeID: {ID: employeeID, VerificationStatus: employees.VerificationApproved},
+		}},
+		&mockServiceCatalog{byID: map[uuid.UUID]*services.EmployeeService{
+			serviceID: {ID: serviceID, EmployeeID: employeeID, Price: 99, IsActive: true},
+		}},
+		store,
+	)
+
+	res, err := svc.RebookPreview(context.Background(), customerUserID, sourceBookingID)
+	if err != nil {
+		t.Fatalf("RebookPreview() error = %v", err)
+	}
+	if !res.CanRebook || !res.ServiceAvailable || res.CurrentPrice == nil || *res.CurrentPrice != 99 {
+		t.Fatalf("unexpected preview: %+v", res)
+	}
+}
+
+func TestRebookFromCompletedBooking(t *testing.T) {
+	customerUserID := uuid.New()
+	customerID := uuid.New()
+	employeeID := uuid.New()
+	serviceID := uuid.New()
+	sourceBookingID := uuid.New()
+
+	store := newMockBookingStore()
+	store.bookings[sourceBookingID] = &Booking{
+		ID:         sourceBookingID,
+		CustomerID: customerID,
+		EmployeeID: employeeID,
+		ServiceID:  serviceID,
+		Status:     StatusCompleted,
+	}
+
+	svc := newTestService(t,
+		&mockCustomerStore{byUserID: map[uuid.UUID]*customers.Profile{
+			customerUserID: {ID: customerID, UserID: customerUserID},
+		}},
+		&mockEmployeeStore{approvedID: map[uuid.UUID]*employees.Profile{
+			employeeID: {ID: employeeID, VerificationStatus: employees.VerificationApproved},
+		}},
+		&mockServiceCatalog{byID: map[uuid.UUID]*services.EmployeeService{
+			serviceID: {ID: serviceID, EmployeeID: employeeID, Price: 75, IsActive: true},
+		}},
+		store,
+	)
+
+	res, err := svc.Rebook(context.Background(), customerUserID, RebookBookingRequest{
+		SourceBookingID: sourceBookingID,
+		BookingDate:     "2026-05-28",
+		StartTime:       availability.TimeOfDay{Hour: 14, Minute: 0},
+		EndTime:         availability.TimeOfDay{Hour: 15, Minute: 0},
+	})
+	if err != nil {
+		t.Fatalf("Rebook() error = %v", err)
+	}
+	if res.SourceBookingID == nil || *res.SourceBookingID != sourceBookingID {
+		t.Fatalf("source_booking_id = %v, want %v", res.SourceBookingID, sourceBookingID)
+	}
+	if res.Status != StatusPending {
+		t.Fatalf("status = %q, want %q", res.Status, StatusPending)
+	}
+}
+
+func TestRebookNotAllowedForPendingBooking(t *testing.T) {
+	customerUserID := uuid.New()
+	customerID := uuid.New()
+	sourceBookingID := uuid.New()
+
+	store := newMockBookingStore()
+	store.bookings[sourceBookingID] = &Booking{
+		ID:         sourceBookingID,
+		CustomerID: customerID,
+		Status:     StatusPending,
+	}
+
+	svc := newTestService(t,
+		&mockCustomerStore{byUserID: map[uuid.UUID]*customers.Profile{
+			customerUserID: {ID: customerID, UserID: customerUserID},
+		}},
+		&mockEmployeeStore{},
+		&mockServiceCatalog{},
+		store,
+	)
+
+	_, err := svc.Rebook(context.Background(), customerUserID, RebookBookingRequest{
+		SourceBookingID: sourceBookingID,
+		BookingDate:     "2026-05-28",
+		StartTime:       availability.TimeOfDay{Hour: 10, Minute: 0},
+		EndTime:         availability.TimeOfDay{Hour: 11, Minute: 0},
+	})
+	if !errors.Is(err, ErrRebookNotAllowed) {
+		t.Fatalf("Rebook() error = %v, want %v", err, ErrRebookNotAllowed)
+	}
+}
+
+func TestRebookForbiddenForOtherCustomer(t *testing.T) {
+	ownerUserID := uuid.New()
+	otherUserID := uuid.New()
+	customerID := uuid.New()
+	sourceBookingID := uuid.New()
+
+	store := newMockBookingStore()
+	store.bookings[sourceBookingID] = &Booking{
+		ID:         sourceBookingID,
+		CustomerID: customerID,
+		Status:     StatusCompleted,
+	}
+
+	svc := newTestService(t,
+		&mockCustomerStore{byUserID: map[uuid.UUID]*customers.Profile{
+			ownerUserID: {ID: customerID, UserID: ownerUserID},
+			otherUserID: {ID: uuid.New(), UserID: otherUserID},
+		}},
+		&mockEmployeeStore{},
+		&mockServiceCatalog{},
+		store,
+	)
+
+	_, err := svc.Rebook(context.Background(), otherUserID, RebookBookingRequest{
+		SourceBookingID: sourceBookingID,
+		BookingDate:     "2026-05-28",
+		StartTime:       availability.TimeOfDay{Hour: 10, Minute: 0},
+		EndTime:         availability.TimeOfDay{Hour: 11, Minute: 0},
+	})
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("Rebook() error = %v, want %v", err, ErrForbidden)
+	}
+}

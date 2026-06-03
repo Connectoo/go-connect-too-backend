@@ -15,7 +15,9 @@ func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
 		r.Use(middleware.RequireRole(users.RoleCustomer))
 
 		r.Post("/bookings", h.create)
+		r.Post("/bookings/rebook", h.rebook)
 		r.Get("/bookings", h.listCustomer)
+		r.Get("/bookings/{id}/rebook-preview", h.rebookPreview)
 		r.Get("/bookings/{id}", h.getCustomer)
 		r.Patch("/bookings/{id}/cancel", h.cancel)
 	})

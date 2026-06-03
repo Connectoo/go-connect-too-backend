@@ -28,6 +28,50 @@ func NewHandler(svc *Service, log *slog.Logger) *Handler {
 	return &Handler{svc: svc, log: log}
 }
 
+func (h *Handler) rebookPreview(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+
+	bookingID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid booking id", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.RebookPreview(r.Context(), userID, bookingID)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Rebook preview loaded", res)
+}
+
+func (h *Handler) rebook(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+
+	var req RebookBookingRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.Rebook(r.Context(), userID, req)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusCreated, "Booking rebooked", res)
+}
+
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -233,7 +277,7 @@ func (h *Handler) writeError(w http.ResponseWriter, err error) {
 		response.Error(w, http.StatusNotFound, "Employee profile not found", sharederrors.CodeNotFound)
 	case errors.Is(err, ErrForbidden):
 		response.Error(w, http.StatusForbidden, "Insufficient permissions", sharederrors.CodeForbidden)
-	case errors.Is(err, ErrDoubleBooking), errors.Is(err, ErrEmployeeUnavailable), errors.Is(err, ErrEmployeeNotApproved):
+	case errors.Is(err, ErrDoubleBooking), errors.Is(err, ErrEmployeeUnavailable), errors.Is(err, ErrEmployeeNotApproved), errors.Is(err, ErrRebookNotAllowed):
 		response.Error(w, http.StatusConflict, "Booking cannot be created", sharederrors.CodeConflict)
 	case errors.Is(err, ErrInvalidStatusTransition):
 		response.Error(w, http.StatusConflict, "Invalid booking status transition", sharederrors.CodeConflict)

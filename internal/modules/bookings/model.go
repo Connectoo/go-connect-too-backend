@@ -10,19 +10,20 @@ import (
 
 // Booking is a service appointment between a customer and an employee.
 type Booking struct {
-	ID            uuid.UUID
-	CustomerID    uuid.UUID
-	EmployeeID    uuid.UUID
-	ServiceID     uuid.UUID
-	BookingDate   time.Time
-	StartTime     availability.TimeOfDay
-	EndTime       availability.TimeOfDay
-	Status        string
-	CustomerNotes *string
-	EmployeeNotes *string
-	TotalAmount   float64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID              uuid.UUID
+	CustomerID      uuid.UUID
+	EmployeeID      uuid.UUID
+	ServiceID       uuid.UUID
+	BookingDate     time.Time
+	StartTime       availability.TimeOfDay
+	EndTime         availability.TimeOfDay
+	Status          string
+	CustomerNotes   *string
+	EmployeeNotes   *string
+	TotalAmount     float64
+	SourceBookingID *uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // StatusHistory records a booking status change.
