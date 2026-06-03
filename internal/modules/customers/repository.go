@@ -40,6 +40,26 @@ func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) (*Profil
 	return &profile, nil
 }
 
+// GetByID loads a customer profile by primary key.
+func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Profile, error) {
+	query := `SELECT id, user_id, created_at, updated_at FROM customer_profiles WHERE id = $1`
+
+	var profile Profile
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&profile.ID,
+		&profile.UserID,
+		&profile.CreatedAt,
+		&profile.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get customer profile by id: %w", err)
+	}
+	return &profile, nil
+}
+
 // CreateForUserInTx inserts a profile row for a newly registered customer user.
 func (r *Repository) CreateForUserInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, at time.Time) error {
 	query := `

@@ -17,10 +17,13 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/availability"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/bookings"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/categories"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/chat"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/customers"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/events"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/kyc"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/moderation"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/notifications"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/payments"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/public"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/reports"
@@ -30,6 +33,8 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/subscriptions"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/webhooks"
+	ws "github.com/MustafaKheda/go-connect-too-backend/internal/modules/websocket"
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/workers"
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/response"
@@ -101,8 +106,28 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	searchRepo := search.NewRepository(sqlDB)
 	searchSvc := search.NewService(searchRepo)
 	searchHandler := search.NewHandler(searchSvc, log)
+	eventDispatcher := events.NewDispatcher()
+	wsHub := ws.NewHub()
+	notificationRepo := notifications.NewRepository(sqlDB)
+	notificationSvc := notifications.NewService(notificationRepo)
+	notificationHandler := notifications.NewHandler(notificationSvc, log)
+	chatRepo := chat.NewRepository(sqlDB)
+	chatSvc := chat.NewService(customerRepo, employeeRepo, chatRepo, eventDispatcher)
+	chatHandler := chat.NewHandler(chatSvc, log)
+	wsHandler := ws.NewHandler(wsHub, tokenManager, log)
+	notificationWorker := workers.NewNotificationWorker(
+		customerRepo,
+		employeeRepo,
+		notificationSvc,
+		notifications.NoopPushProvider{},
+		chatSvc,
+		wsHub,
+		log,
+	)
+	notificationWorker.Register(eventDispatcher)
+	bookingPublisher := workers.NewBookingPublisher(eventDispatcher)
 	bookingRepo := bookings.NewRepository(sqlDB)
-	bookingSvc := bookings.NewService(customerRepo, employeeRepo, serviceRepo, bookingRepo, bookings.NoopEventPublisher{})
+	bookingSvc := bookings.NewService(customerRepo, employeeRepo, serviceRepo, bookingRepo, bookingPublisher)
 	bookingHandler := bookings.NewHandler(bookingSvc, log)
 	adminRepo := admin.NewRepository(sqlDB)
 	adminSvc := admin.NewService(adminRepo, userRepo)
@@ -131,6 +156,9 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		services.RegisterRoutes(r, serviceHandler, tokenManager)
 		availability.RegisterRoutes(r, availabilityHandler, tokenManager)
 		bookings.RegisterRoutes(r, bookingHandler, tokenManager)
+		notifications.RegisterRoutes(r, notificationHandler, tokenManager)
+		chat.RegisterRoutes(r, chatHandler, tokenManager)
+		ws.RegisterRoutes(r, wsHandler)
 		admin.RegisterRoutes(r, adminHandler, tokenManager)
 		settings.RegisterRoutes(r, settingsHandler, tokenManager)
 		moderation.RegisterRoutes(r, moderationHandler, tokenManager)
@@ -144,7 +172,7 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		Addr:         fmt.Sprintf(":%d", cfg.HTTPPort),
 		Handler:      s.router,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 0,
 		IdleTimeout:  60 * time.Second,
 	}
 
