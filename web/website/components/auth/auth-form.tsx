@@ -27,112 +27,163 @@ type AuthFormProps = {
 
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
-  const schema = mode === "login" ? loginSchema : registerSchema;
-  type FormValues = z.infer<typeof registerSchema>;
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  const loginForm = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  const registerForm = useForm<z.infer<typeof registerSchema>>({
+    resolver: zodResolver(registerSchema),
     defaultValues: { email: "", password: "", name: "", phone: "" },
   });
 
-  const mutation = useMutation({
-    mutationFn: (values: FormValues) =>
-      mode === "login"
-        ? loginCustomer({ email: values.email, password: values.password })
-        : registerCustomer({
-            name: values.name,
-            email: values.email,
-            password: values.password,
-            phone: values.phone || undefined,
-          }),
+  const loginMutation = useMutation({
+    mutationFn: loginCustomer,
     onSuccess: (data) => {
-      if (data.user) {
-        saveAuth({ user: data.user, tokens: data.tokens });
-      }
+      if (data.user) saveAuth({ user: data.user, tokens: data.tokens });
       router.push("/");
     },
   });
 
+  const registerMutation = useMutation({
+    mutationFn: registerCustomer,
+    onSuccess: (data) => {
+      if (data.user) saveAuth({ user: data.user, tokens: data.tokens });
+      router.push("/");
+    },
+  });
+
+  if (mode === "login") {
+    return (
+      <form
+        className="space-y-4"
+        onSubmit={loginForm.handleSubmit((values) => loginMutation.mutate(values))}
+      >
+        <Field
+          id="email"
+          label="Email"
+          error={loginForm.formState.errors.email?.message}
+          input={<Input type="email" autoComplete="email" {...loginForm.register("email")} />}
+        />
+        <Field
+          id="password"
+          label="Password"
+          error={loginForm.formState.errors.password?.message}
+          input={
+            <Input
+              type="password"
+              autoComplete="current-password"
+              {...loginForm.register("password")}
+            />
+          }
+        />
+        <ErrorMessage error={loginMutation.error} />
+        <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+          {loginMutation.isPending ? "Please wait..." : "Sign in"}
+        </Button>
+        <Footer mode="login" />
+      </form>
+    );
+  }
+
   return (
     <form
       className="space-y-4"
-      onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+      onSubmit={registerForm.handleSubmit((values) =>
+        registerMutation.mutate({
+          name: values.name,
+          email: values.email,
+          password: values.password,
+          phone: values.phone || undefined,
+        }),
+      )}
     >
-      {mode === "register" && (
-        <div className="space-y-2">
-          <Label htmlFor="name">Full name</Label>
-          <Input id="name" {...form.register("name")} />
-          {form.formState.errors.name && (
-            <p className="text-sm text-destructive">
-              {form.formState.errors.name.message}
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" autoComplete="email" {...form.register("email")} />
-        {form.formState.errors.email && (
-          <p className="text-sm text-destructive">
-            {form.formState.errors.email.message}
-          </p>
-        )}
-      </div>
-
-      {mode === "register" && (
-        <div className="space-y-2">
-          <Label htmlFor="phone">Phone (optional)</Label>
-          <Input id="phone" {...form.register("phone")} />
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-          {...form.register("password")}
-        />
-        {form.formState.errors.password && (
-          <p className="text-sm text-destructive">
-            {form.formState.errors.password.message}
-          </p>
-        )}
-      </div>
-
-      {mutation.isError && (
-        <p className="text-sm text-destructive">
-          {(mutation.error as Error).message || "Authentication failed"}
-        </p>
-      )}
-
-      <Button type="submit" className="w-full" disabled={mutation.isPending}>
-        {mutation.isPending
-          ? "Please wait..."
-          : mode === "login"
-            ? "Sign in"
-            : "Create account"}
+      <Field
+        id="name"
+        label="Full name"
+        error={registerForm.formState.errors.name?.message}
+        input={<Input {...registerForm.register("name")} />}
+      />
+      <Field
+        id="email"
+        label="Email"
+        error={registerForm.formState.errors.email?.message}
+        input={<Input type="email" autoComplete="email" {...registerForm.register("email")} />}
+      />
+      <Field
+        id="phone"
+        label="Phone (optional)"
+        input={<Input {...registerForm.register("phone")} />}
+      />
+      <Field
+        id="password"
+        label="Password"
+        error={registerForm.formState.errors.password?.message}
+        input={
+          <Input
+            type="password"
+            autoComplete="new-password"
+            {...registerForm.register("password")}
+          />
+        }
+      />
+      <ErrorMessage error={registerMutation.error} />
+      <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
+        {registerMutation.isPending ? "Please wait..." : "Create account"}
       </Button>
-
-      <p className="text-center text-sm text-muted-foreground">
-        {mode === "login" ? (
-          <>
-            No account?{" "}
-            <Link href="/register" className="text-primary underline-offset-4 hover:underline">
-              Register
-            </Link>
-          </>
-        ) : (
-          <>
-            Already have an account?{" "}
-            <Link href="/login" className="text-primary underline-offset-4 hover:underline">
-              Sign in
-            </Link>
-          </>
-        )}
-      </p>
+      <Footer mode="register" />
     </form>
+  );
+}
+
+function Field({
+  id,
+  label,
+  input,
+  error,
+}: {
+  id: string;
+  label: string;
+  input: React.ReactNode;
+  error?: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      {input}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function ErrorMessage({ error }: { error: unknown }) {
+  if (!error) return null;
+  return (
+    <p className="text-sm text-destructive">
+      {(error as Error).message || "Authentication failed"}
+    </p>
+  );
+}
+
+function Footer({ mode }: { mode: "login" | "register" }) {
+  return (
+    <p className="text-center text-sm text-muted-foreground">
+      {mode === "login" ? (
+        <>
+          No account?{" "}
+          <Link href="/register" className="text-primary underline-offset-4 hover:underline">
+            Register
+          </Link>
+        </>
+      ) : (
+        <>
+          Already have an account?{" "}
+          <Link href="/login" className="text-primary underline-offset-4 hover:underline">
+            Sign in
+          </Link>
+        </>
+      )}
+    </p>
   );
 }
