@@ -3,8 +3,10 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -23,6 +25,7 @@ type S3Config struct {
 	Region    string
 	AccessKey string
 	SecretKey string
+	Endpoint  string
 	BaseURL   string
 }
 
@@ -48,13 +51,26 @@ func NewS3Storage(ctx context.Context, cfg S3Config) (*S3Storage, error) {
 
 	baseURL := cfg.BaseURL
 	if baseURL == "" {
-		baseURL = fmt.Sprintf("https://%s.s3.%s.amazonaws.com", cfg.Bucket, cfg.Region)
+		if endpoint := strings.TrimRight(strings.TrimSpace(cfg.Endpoint), "/"); endpoint != "" {
+			baseURL = endpoint + "/" + cfg.Bucket
+		} else {
+			baseURL = fmt.Sprintf("https://%s.s3.%s.amazonaws.com", cfg.Bucket, cfg.Region)
+		}
+	}
+
+	clientOpts := []func(*s3.Options){}
+	if endpoint := strings.TrimSpace(cfg.Endpoint); endpoint != "" {
+		endpoint = strings.TrimRight(endpoint, "/")
+		clientOpts = append(clientOpts, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(endpoint)
+			o.UsePathStyle = true
+		})
 	}
 
 	return &S3Storage{
-		client:  s3.NewFromConfig(awsCfg),
+		client:  s3.NewFromConfig(awsCfg, clientOpts...),
 		bucket:  cfg.Bucket,
-		baseURL: baseURL,
+		baseURL: strings.TrimRight(baseURL, "/"),
 	}, nil
 }
 

@@ -85,6 +85,7 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 	authRepo := auth.NewRepository(sqlDB)
 	emailSender := platformemail.NewSender(platformemail.Config{
 		Host: cfg.SMTPHost,
+		Port: cfg.SMTPPort,
 		User: cfg.SMTPUser,
 		Pass: cfg.SMTPPass,
 		From: cfg.SMTPFrom,
@@ -123,6 +124,8 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 			Region:    cfg.S3Region,
 			AccessKey: cfg.S3AccessKey,
 			SecretKey: cfg.S3SecretKey,
+			Endpoint:  cfg.S3Endpoint,
+			BaseURL:   cfg.S3BaseURL,
 		})
 		if err != nil {
 			log.Error("s3 storage init failed", slog.String("error", err.Error()))

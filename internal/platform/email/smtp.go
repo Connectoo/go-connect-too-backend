@@ -9,6 +9,7 @@ import (
 // Config holds SMTP connection settings.
 type Config struct {
 	Host string
+	Port int
 	User string
 	Pass string
 	From string
@@ -45,13 +46,27 @@ func (s *Sender) Send(to, subject, body string) error {
 	msg.WriteString("\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n")
 	msg.WriteString(body)
 
-	addr := s.cfg.Host
+	addr := smtpAddr(s.cfg.Host, s.cfg.Port)
 	var auth smtp.Auth
 	if s.cfg.User != "" {
 		auth = smtp.PlainAuth("", s.cfg.User, s.cfg.Pass, hostFromAddr(addr))
 	}
 
 	return smtp.SendMail(addr, auth, s.cfg.From, []string{to}, []byte(msg.String()))
+}
+
+func smtpAddr(host string, port int) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return ""
+	}
+	if strings.Contains(host, ":") {
+		return host
+	}
+	if port <= 0 {
+		port = 587
+	}
+	return fmt.Sprintf("%s:%d", host, port)
 }
 
 func hostFromAddr(addr string) string {

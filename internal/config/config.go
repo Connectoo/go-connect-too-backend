@@ -43,6 +43,8 @@ type Config struct {
 	S3Region        string
 	S3AccessKey     string
 	S3SecretKey     string
+	S3Endpoint      string
+	S3BaseURL       string
 }
 
 // Load reads configuration from the environment.
@@ -123,11 +125,13 @@ func Load() (*Config, error) {
 		SMTPUser:              os.Getenv("SMTP_USER"),
 		SMTPPass:              os.Getenv("SMTP_PASS"),
 		SMTPFrom:              os.Getenv("SMTP_FROM"),
-		StorageProvider:       getEnv("STORAGE_PROVIDER", "s3"),
+		StorageProvider:       getEnv("STORAGE_PROVIDER", ""),
 		S3Bucket:              os.Getenv("S3_BUCKET"),
-		S3Region:              os.Getenv("S3_REGION"),
+		S3Region:              getEnv("S3_REGION", "us-east-1"),
 		S3AccessKey:           os.Getenv("S3_ACCESS_KEY"),
 		S3SecretKey:           os.Getenv("S3_SECRET_KEY"),
+		S3Endpoint:            os.Getenv("S3_ENDPOINT"),
+		S3BaseURL:             os.Getenv("S3_BASE_URL"),
 	}, nil
 }
 
