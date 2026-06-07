@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Enable Let's Encrypt HTTPS for VPC deployment (www, admin, app, provider, api).
+# Enable Let's Encrypt HTTPS for VPC deployment (www, admin, app, provider, api, minio).
 # Requires a real domain — nip.io will NOT work with Let's Encrypt.
 # Run as root AFTER setup-vm-vpc.sh: bash deploy/azure/enable-https-vpc.sh
 set -euo pipefail
@@ -32,7 +32,7 @@ fi
 
 if [[ "${DOMAIN}" == *"nip.io" ]]; then
   echo "DOMAIN is nip.io (${DOMAIN}) — Let's Encrypt cannot issue certs for nip.io."
-  echo "Point a real domain (A records for www, admin, app, provider) to this VM, then set DOMAIN=goconnect.in"
+  echo "Point a real domain (A records for www, admin, app, provider, minio) to this VM, then set DOMAIN=goconnect.in"
   exit 1
 fi
 
@@ -44,6 +44,9 @@ fi
 # shellcheck disable=SC1091
 source deploy/azure/resolve-domain.sh
 resolve_domain_config
+
+MINIO_CONSOLE_HOST="minio.${DOMAIN}"
+MINIO_CONSOLE_URL="https://${MINIO_CONSOLE_HOST}"
 
 echo "==> Checking HTTP is reachable before certbot..."
 for host in www admin app provider; do
@@ -57,6 +60,46 @@ if ! curl -fsS --max-time 10 "http://api.${DOMAIN}/api/v1/health" -o /dev/null; 
   exit 1
 fi
 
+echo "==> Installing MinIO console Nginx site (for minio.${DOMAIN} certificate)..."
+grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env \
+  | grep -v '^MINIO_CONSOLE_AUTH_USER=' \
+  | grep -v '^MINIO_CONSOLE_AUTH_PASSWORD=' > .env.tmp || true
+{
+  cat .env.tmp
+  echo "MINIO_BROWSER_REDIRECT_URL=${MINIO_CONSOLE_URL}"
+} > .env
+rm -f .env.tmp
+
+set -a
+# shellcheck disable=SC1091
+source .env
+set +a
+
+docker compose -f docker-compose.azure.yml up -d minio
+
+echo "==> Waiting for MinIO console on 127.0.0.1:9001..."
+for _ in $(seq 1 30); do
+  if curl -fsS --max-time 2 "http://127.0.0.1:9001/" -o /dev/null; then
+    break
+  fi
+  sleep 2
+done
+if ! curl -fsS --max-time 5 "http://127.0.0.1:9001/" -o /dev/null; then
+  echo "MinIO console is not responding on 127.0.0.1:9001 — check: docker logs go-connect-minio"
+  exit 1
+fi
+
+export DOMAIN
+envsubst '$DOMAIN' < deploy/azure/nginx/minio-console-vpc.conf > /etc/nginx/sites-available/minio-console
+ln -sf /etc/nginx/sites-available/minio-console /etc/nginx/sites-enabled/minio-console
+nginx -t
+systemctl reload nginx
+
+if ! curl -fsS --max-time 10 -H "Host: ${MINIO_CONSOLE_HOST}" "http://127.0.0.1/" -o /dev/null; then
+  echo "Nginx is not proxying ${MINIO_CONSOLE_HOST} — check sites-enabled/minio-console"
+  exit 1
+fi
+
 echo "==> Requesting Let's Encrypt certificate..."
 certbot --nginx --non-interactive --agree-tos --expand \
   --email "${LETSENCRYPT_EMAIL}" \
@@ -65,6 +108,7 @@ certbot --nginx --non-interactive --agree-tos --expand \
   -d "app.${DOMAIN}" \
   -d "provider.${DOMAIN}" \
   -d "api.${DOMAIN}" \
+  -d "${MINIO_CONSOLE_HOST}" \
   --redirect
 
 export USE_HTTPS=true
@@ -91,9 +135,6 @@ set +a
 source deploy/azure/resolve-domain.sh
 resolve_domain_config
 
-echo "==> Rebuilding frontends with HTTPS URLs..."
-bash deploy/azure/deploy-vpc.sh
-
 echo "==> Restarting API (pick up CORS / S3_BASE_URL)..."
 docker compose -f docker-compose.azure.yml up -d
 
@@ -110,7 +151,10 @@ HTTPS enabled (Let's Encrypt).
   Employee: https://provider.${DOMAIN}/login
   API:      https://api.${DOMAIN}/api/v1/health
   Docs:     https://api.${DOMAIN}/api/v1/docs/
+  MinIO:    https://minio.${DOMAIN}
 
 Cert auto-renews via certbot systemd timer. Check: systemctl status certbot.timer
+
+If frontends still use http:// API URLs, run once: bash deploy/azure/deploy-vpc.sh
 
 EOF

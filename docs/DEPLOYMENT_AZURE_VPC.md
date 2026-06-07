@@ -159,7 +159,7 @@ Point A records to your VM **public IP**:
 | `app` | `app.connectoo.online` |
 | `provider` | `provider.connectoo.online` |
 | `api` | `api.connectoo.online` |
-| `minio` | `minio.connectoo.online` (optional — MinIO console UI) |
+| `minio` | `minio.connectoo.online` (MinIO console — required before enable-https-vpc.sh) |
 
 Wait until all resolve: `dig +short www.connectoo.online`
 
@@ -179,14 +179,20 @@ DOMAIN=goconnect.in
 LETSENCRYPT_EMAIL=you@yourdomain.com
 ```
 
-Then:
+Then (requires DNS A record for `minio.<domain>` as well):
 
 ```bash
 chmod +x deploy/azure/enable-https-vpc.sh
 sudo bash deploy/azure/enable-https-vpc.sh
 ```
 
-This runs certbot, enables HTTP→HTTPS redirect, rebuilds frontends with `https://` URLs, and restarts the API.
+This installs the MinIO console Nginx site, runs certbot for **www, admin, app, provider, api, and minio**, enables HTTP→HTTPS redirect, and restarts the API.
+
+If frontends still call `http://` URLs, run once after HTTPS:
+
+```bash
+bash deploy/azure/deploy-vpc.sh
+```
 
 ### Verify
 
@@ -230,17 +236,11 @@ Should show `Access-Control-Allow-Origin: https://www.connectoo.online`.
 
 ---
 
-## 5c. MinIO Console UI (optional)
+## 5c. MinIO Console UI
 
-Browse uploaded files in a web UI at `https://minio.<domain>`. **Do not** open ports 9000/9001 in Azure NSG.
+Included in `enable-https-vpc.sh` (certificate + Nginx for `minio.<domain>`).
 
-### DNS
-
-| Host | Example |
-|------|---------|
-| `minio` | `minio.connectoo.online` |
-
-### Enable (after HTTPS)
+If you enabled HTTPS before this was added, or need to reconfigure MinIO only:
 
 ```bash
 cd /opt/go-connect
@@ -250,6 +250,12 @@ sudo bash deploy/azure/enable-minio-console-vpc.sh
 ```
 
 Open **https://minio.connectoo.online** — log in with `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` from `.env`.
+
+If the browser shows **Not secure** on `minio.*`, the cert was issued before MinIO was added. Fix:
+
+```bash
+sudo bash deploy/azure/fix-minio-ssl-vpc.sh
+```
 
 Bucket: `go-connect-uploads`
 
@@ -330,6 +336,7 @@ Internet
 | `deploy/azure/nginx/go-connect-vpc.conf` | Nginx — frontends + `/api/` proxy |
 | `deploy/azure/enable-https-vpc.sh` | Let's Encrypt HTTPS |
 | `deploy/azure/enable-minio-console-vpc.sh` | MinIO web UI at minio.* |
+| `deploy/azure/fix-minio-ssl-vpc.sh` | Fix "Not secure" on minio.* (expand SSL cert) |
 | `deploy/azure/nginx/minio-console-vpc.conf` | Nginx — MinIO console proxy |
 | `deploy/azure/env.vpc.example` | Env template |
 | `docker-compose.azure.yml` | Postgres + MinIO + API (localhost ports) |

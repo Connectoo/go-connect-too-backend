@@ -107,16 +107,22 @@ if ! curl_console "http://${CONSOLE_HOST}/"; then
   fi
 fi
 
-echo "==> Expanding Let's Encrypt certificate for ${CONSOLE_HOST}..."
-certbot --nginx --non-interactive --agree-tos --expand \
-  --email "${LETSENCRYPT_EMAIL}" \
-  -d "www.${DOMAIN}" \
-  -d "admin.${DOMAIN}" \
-  -d "app.${DOMAIN}" \
-  -d "provider.${DOMAIN}" \
-  -d "api.${DOMAIN}" \
-  -d "${CONSOLE_HOST}" \
-  --redirect
+echo "==> Expanding Let's Encrypt certificate for ${CONSOLE_HOST} (skip if already valid)..."
+if echo | openssl s_client -servername "${CONSOLE_HOST}" -connect 127.0.0.1:443 2>/dev/null \
+  | openssl x509 -noout -text 2>/dev/null \
+  | grep -q "DNS:${CONSOLE_HOST}"; then
+  echo "Certificate already valid for ${CONSOLE_HOST} — skipping certbot."
+else
+  certbot --nginx --non-interactive --agree-tos --expand \
+    --email "${LETSENCRYPT_EMAIL}" \
+    -d "www.${DOMAIN}" \
+    -d "admin.${DOMAIN}" \
+    -d "app.${DOMAIN}" \
+    -d "provider.${DOMAIN}" \
+    -d "api.${DOMAIN}" \
+    -d "${CONSOLE_HOST}" \
+    --redirect
+fi
 
 nginx -t
 systemctl reload nginx
