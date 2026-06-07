@@ -35,10 +35,17 @@ if ! command -v pm2 >/dev/null 2>&1; then
   npm install -g pm2
 fi
 
-if ! command -v migrate >/dev/null 2>&1; then
+if ! command -v go >/dev/null 2>&1 && [[ ! -x /usr/local/go/bin/go ]]; then
+  echo "==> Installing Go..."
   curl -fsSL https://go.dev/dl/go1.26.3.linux-amd64.tar.gz -o /tmp/go.tar.gz
   tar -C /usr/local -xzf /tmp/go.tar.gz
-  export PATH="/usr/local/go/bin:$PATH"
+fi
+export PATH="/usr/local/go/bin:${PATH}"
+if command -v go >/dev/null 2>&1; then
+  export PATH="$(go env GOPATH)/bin:${PATH}"
+fi
+
+if ! command -v migrate >/dev/null 2>&1; then
   go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
   ln -sf "$(go env GOPATH)/bin/migrate" /usr/local/bin/migrate
 fi
@@ -114,7 +121,6 @@ echo "==> Running migrations..."
 migrate -path migrations -database "${DATABASE_URL}" up
 
 echo "==> Seeding demo data..."
-export PATH="/usr/local/go/bin:$(go env GOPATH 2>/dev/null)/bin:$PATH"
 go run ./cmd/seed
 
 echo "==> Building public Next.js apps..."
@@ -144,8 +150,9 @@ API (private — not on api.*; reached via frontend /api/ proxy):
 Demo logins (password Demo123!):
   admin@yopmail.com, alice@yopmail.com, karim@yopmail.com
 
-Optional HTTPS:
-  certbot --nginx -d www.${DOMAIN} -d admin.${DOMAIN} -d app.${DOMAIN} -d provider.${DOMAIN}
-  # then set USE_HTTPS=true in .env and re-run deploy-vpc.sh + docker compose up -d --build
+HTTPS (real domain required — not nip.io):
+  # 1. A records: www, admin, app, provider → VM public IP
+  # 2. Set DOMAIN=goconnect.in and LETSENCRYPT_EMAIL in .env
+  # 3. bash deploy/azure/enable-https-vpc.sh
 
 EOF

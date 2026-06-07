@@ -33,10 +33,17 @@ if ! command -v pm2 >/dev/null 2>&1; then
   npm install -g pm2
 fi
 
-if ! command -v migrate >/dev/null 2>&1; then
+if ! command -v go >/dev/null 2>&1 && [[ ! -x /usr/local/go/bin/go ]]; then
+  echo "==> Installing Go..."
   curl -fsSL https://go.dev/dl/go1.26.3.linux-amd64.tar.gz -o /tmp/go.tar.gz
   tar -C /usr/local -xzf /tmp/go.tar.gz
-  export PATH="/usr/local/go/bin:$PATH"
+fi
+export PATH="/usr/local/go/bin:${PATH}"
+if command -v go >/dev/null 2>&1; then
+  export PATH="$(go env GOPATH)/bin:${PATH}"
+fi
+
+if ! command -v migrate >/dev/null 2>&1; then
   go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
   ln -sf "$(go env GOPATH)/bin/migrate" /usr/local/bin/migrate
 fi

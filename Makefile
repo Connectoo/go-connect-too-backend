@@ -1,4 +1,4 @@
-.PHONY: run test migrate-up migrate-down install-tools tidy fmt dev-up dev-down seed db-clean db-refresh
+.PHONY: run test migrate-up migrate-down install-tools tidy fmt dev-up dev-down dev-vpc dev-vpc-down seed db-clean db-refresh
 
 MIGRATE := $(shell go env GOPATH)/bin/migrate
 
@@ -40,6 +40,14 @@ dev-up:
 dev-down:
 	@chmod +x scripts/dev-up.sh scripts/dev-down.sh
 	@./scripts/dev-down.sh
+
+dev-vpc:
+	@chmod +x scripts/dev-vpc.sh scripts/dev-vpc-down.sh
+	@./scripts/dev-vpc.sh
+
+dev-vpc-down:
+	@chmod +x scripts/dev-vpc-down.sh
+	@./scripts/dev-vpc-down.sh
 
 seed:
 	go run ./cmd/seed

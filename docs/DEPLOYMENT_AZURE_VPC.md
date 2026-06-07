@@ -12,6 +12,31 @@ Browsers call `https://admin.<domain>/api/v1/...` — Nginx forwards to the priv
 
 For everything public including `api.*`, see [DEPLOYMENT_AZURE.md](./DEPLOYMENT_AZURE.md).
 
+### Test locally first (Mac/Linux)
+
+Mirrors the Azure VPC layout on your machine:
+
+```bash
+brew install nginx   # macOS (once)
+cp .env.example .env
+docker compose up -d
+make migrate-up
+make seed            # optional demo data
+make dev-vpc
+```
+
+Then open:
+
+| App | URL |
+|-----|-----|
+| Website | http://www.localhost:8880 |
+| Admin | http://admin.localhost:8880/login |
+| API (via proxy) | http://www.localhost:8880/api/v1/health |
+
+Stop: `make dev-vpc-down`
+
+Normal dev (API on `:8080` directly, no Nginx): `make dev-up`
+
 ---
 
 ## 1. Create the VNet and VM
@@ -113,19 +138,57 @@ Demo logins: `admin@yopmail.com` / `alice@yopmail.com` / `karim@yopmail.com` —
 
 ---
 
-## 5. HTTPS (optional)
+## 5. HTTPS with Let's Encrypt
+
+**Requires a real domain** — Let's Encrypt does **not** work with nip.io.
+
+### DNS (before certbot)
+
+Point A records to your VM **public IP**:
+
+| Host | Example |
+|------|---------|
+| `www` | `www.goconnect.in` |
+| `admin` | `admin.goconnect.in` |
+| `app` | `app.goconnect.in` |
+| `provider` | `provider.goconnect.in` |
+
+Wait until all resolve: `dig +short www.goconnect.in`
+
+### Enable HTTPS (one command)
+
+On the VM, after HTTP setup works:
 
 ```bash
-certbot --nginx \
-  -d www.<nip.io> -d admin.<nip.io> -d app.<nip.io> -d provider.<nip.io>
+cd /opt/go-connect
+nano .env
 ```
 
-Set `USE_HTTPS=true` in `.env`, then:
+Set:
+
+```env
+DOMAIN=goconnect.in
+LETSENCRYPT_EMAIL=you@yourdomain.com
+```
+
+Then:
 
 ```bash
-bash deploy/azure/deploy-vpc.sh
-docker compose -f docker-compose.azure.yml up -d --build
+chmod +x deploy/azure/enable-https-vpc.sh
+sudo bash deploy/azure/enable-https-vpc.sh
 ```
+
+This runs certbot, enables HTTP→HTTPS redirect, rebuilds frontends with `https://` URLs, and restarts the API.
+
+### Verify
+
+```bash
+curl https://www.goconnect.in/api/v1/health
+```
+
+Certs auto-renew: `systemctl status certbot.timer`
+
+**Do not** re-run `setup-vm-vpc.sh` after HTTPS — it overwrites Nginx SSL config. Use `deploy-vpc.sh` for frontend-only redeploys.
 
 ---
 
