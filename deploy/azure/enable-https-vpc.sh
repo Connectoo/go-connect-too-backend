@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Enable Let's Encrypt HTTPS for VPC deployment (www, admin, app, provider).
+# Enable Let's Encrypt HTTPS for VPC deployment (www, admin, app, provider, api).
 # Requires a real domain — nip.io will NOT work with Let's Encrypt.
 # Run as root AFTER setup-vm-vpc.sh: bash deploy/azure/enable-https-vpc.sh
 set -euo pipefail
@@ -46,15 +46,19 @@ source deploy/azure/resolve-domain.sh
 resolve_domain_config
 
 echo "==> Checking HTTP is reachable before certbot..."
-for host in www admin app provider api; do
+for host in www admin app provider; do
   if ! curl -fsS --max-time 10 "http://${host}.${DOMAIN}/" -o /dev/null; then
     echo "Cannot reach http://${host}.${DOMAIN}/ — fix DNS (A → VM public IP) and Nginx first."
     exit 1
   fi
 done
+if ! curl -fsS --max-time 10 "http://api.${DOMAIN}/api/v1/health" -o /dev/null; then
+  echo "Cannot reach http://api.${DOMAIN}/api/v1/health — fix DNS (A → VM public IP) and Nginx first."
+  exit 1
+fi
 
 echo "==> Requesting Let's Encrypt certificate..."
-certbot --nginx --non-interactive --agree-tos \
+certbot --nginx --non-interactive --agree-tos --expand \
   --email "${LETSENCRYPT_EMAIL}" \
   -d "www.${DOMAIN}" \
   -d "admin.${DOMAIN}" \
