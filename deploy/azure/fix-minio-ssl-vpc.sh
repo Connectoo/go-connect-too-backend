@@ -36,10 +36,12 @@ cert_covers_minio() {
 }
 
 echo "==> Ensuring MinIO nginx site and redirect URL..."
-grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env > .env.tmp || true
+grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env \
+  | grep -v '^MINIO_SERVER_URL=' > .env.tmp || true
 {
   cat .env.tmp
   echo "MINIO_BROWSER_REDIRECT_URL=${CONSOLE_URL}"
+  echo "MINIO_SERVER_URL=${CONSOLE_URL}"
 } > .env
 rm -f .env.tmp
 

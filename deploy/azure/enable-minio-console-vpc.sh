@@ -41,11 +41,13 @@ CONSOLE_URL="https://${CONSOLE_HOST}"
 
 persist_minio_env() {
   grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env \
+    | grep -v '^MINIO_SERVER_URL=' \
     | grep -v '^MINIO_CONSOLE_AUTH_USER=' \
     | grep -v '^MINIO_CONSOLE_AUTH_PASSWORD=' > .env.tmp || true
   {
     cat .env.tmp
     echo "MINIO_BROWSER_REDIRECT_URL=${CONSOLE_URL}"
+    echo "MINIO_SERVER_URL=${CONSOLE_URL}"
   } > .env
   rm -f .env.tmp
 }

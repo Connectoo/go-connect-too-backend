@@ -62,11 +62,13 @@ fi
 
 echo "==> Installing MinIO console Nginx site (for minio.${DOMAIN} certificate)..."
 grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env \
+  | grep -v '^MINIO_SERVER_URL=' \
   | grep -v '^MINIO_CONSOLE_AUTH_USER=' \
   | grep -v '^MINIO_CONSOLE_AUTH_PASSWORD=' > .env.tmp || true
 {
   cat .env.tmp
   echo "MINIO_BROWSER_REDIRECT_URL=${MINIO_CONSOLE_URL}"
+  echo "MINIO_SERVER_URL=${MINIO_CONSOLE_URL}"
 } > .env
 rm -f .env.tmp
 
