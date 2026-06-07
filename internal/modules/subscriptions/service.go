@@ -31,6 +31,13 @@ type Store interface {
 	UpdatePlan(ctx context.Context, id uuid.UUID, plan *Plan, at time.Time) (*Plan, error)
 	CurrentByEmployeeID(ctx context.Context, employeeID uuid.UUID, at time.Time) (*EmployeeSubscription, error)
 	ListAllSubscriptions(ctx context.Context) ([]EmployeeSubscription, error)
+	Cancel(ctx context.Context, subscriptionID uuid.UUID, reason *string, at time.Time) (*EmployeeSubscription, error)
+	CreatePendingPlanChange(ctx context.Context, employeeID, oldPlanID, newPlanID uuid.UUID, at time.Time) (*EmployeeSubscription, error)
+	SetAutoRenew(ctx context.Context, employeeID uuid.UUID, autoRenew bool, at time.Time) (*EmployeeSubscription, error)
+}
+
+type PaymentVerifier interface {
+	VerifySubscriptionPayment(ctx context.Context, employeeID uuid.UUID, req payments.VerifyPaymentInput) (*payments.PaymentResponse, error)
 }
 
 type PaymentOrderCreator interface {
@@ -41,11 +48,18 @@ type Service struct {
 	profiles EmployeeProfileStore
 	store    Store
 	payments PaymentOrderCreator
+	verifier PaymentVerifier
 	now      func() time.Time
 }
 
 func NewService(profiles EmployeeProfileStore, store Store, payments PaymentOrderCreator) *Service {
 	return &Service{profiles: profiles, store: store, payments: payments, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// WithPaymentVerifier wires client-side payment verification.
+func (s *Service) WithPaymentVerifier(verifier PaymentVerifier) *Service {
+	s.verifier = verifier
+	return s
 }
 
 func (s *Service) ListPlans(ctx context.Context) ([]PlanResponse, error) {
@@ -120,6 +134,80 @@ func (s *Service) UpdatePlan(ctx context.Context, id uuid.UUID, req UpdatePlanRe
 	return toPlanResponse(updated), nil
 }
 
+func (s *Service) Cancel(ctx context.Context, userID uuid.UUID, req CancelSubscriptionRequest) (*SubscriptionResponse, error) {
+	profile, err := s.profiles.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	current, err := s.store.CurrentByEmployeeID(ctx, profile.ID, s.now())
+	if err != nil {
+		return nil, err
+	}
+	reason := optionalReason(req.Reason)
+	updated, err := s.store.Cancel(ctx, current.ID, reason, s.now())
+	if err != nil {
+		return nil, err
+	}
+	return toSubscriptionResponse(updated), nil
+}
+
+func (s *Service) ChangePlan(ctx context.Context, userID uuid.UUID, req ChangePlanRequest) (*SubscriptionResponse, error) {
+	if req.PlanID == uuid.Nil {
+		return nil, fmt.Errorf("%w: plan_id is required", ErrValidation)
+	}
+	profile, err := s.profiles.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	current, err := s.store.CurrentByEmployeeID(ctx, profile.ID, s.now())
+	if err != nil {
+		return nil, err
+	}
+	plan, err := s.store.GetPlanByID(ctx, req.PlanID)
+	if err != nil {
+		return nil, err
+	}
+	if !plan.IsActive {
+		return nil, ErrPlanInactive
+	}
+	if plan.ID == current.PlanID {
+		return toSubscriptionResponse(current), nil
+	}
+	created, err := s.store.CreatePendingPlanChange(ctx, profile.ID, current.PlanID, plan.ID, s.now())
+	if err != nil {
+		return nil, err
+	}
+	return toSubscriptionResponse(created), nil
+}
+
+func (s *Service) SetAutoRenew(ctx context.Context, userID uuid.UUID, req AutoRenewRequest) (*SubscriptionResponse, error) {
+	profile, err := s.profiles.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := s.store.SetAutoRenew(ctx, profile.ID, req.AutoRenew, s.now())
+	if err != nil {
+		return nil, err
+	}
+	return toSubscriptionResponse(updated), nil
+}
+
+func (s *Service) VerifyPayment(ctx context.Context, userID uuid.UUID, req VerifyPaymentRequest) (*payments.PaymentResponse, error) {
+	if s.verifier == nil {
+		return nil, fmt.Errorf("%w: payment verification is not configured", ErrValidation)
+	}
+	profile, err := s.profiles.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.verifier.VerifySubscriptionPayment(ctx, profile.ID, payments.VerifyPaymentInput{
+		PaymentID:         req.PaymentID,
+		ProviderOrderID:   req.ProviderOrderID,
+		ProviderPaymentID: req.ProviderPaymentID,
+		Signature:         req.Signature,
+	})
+}
+
 func (s *Service) ListSubscriptions(ctx context.Context, status string, page pagination.Params) (pagination.Result[SubscriptionResponse], error) {
 	if adminStore, ok := s.store.(AdminStore); ok {
 		items, total, err := adminStore.ListAdmin(ctx, AdminListFilter{
@@ -183,8 +271,19 @@ func toPlanResponse(plan *Plan) *PlanResponse {
 	}
 	return &PlanResponse{ID: plan.ID, Name: plan.Name, Price: plan.Price, Currency: plan.Currency, DurationDays: plan.DurationDays, ServiceLimit: plan.ServiceLimit, IsFeaturedAllowed: plan.IsFeaturedAllowed, IsPriorityAllowed: plan.IsPriorityAllowed, IsActive: plan.IsActive, CreatedAt: plan.CreatedAt.UTC().Format(time.RFC3339), UpdatedAt: plan.UpdatedAt.UTC().Format(time.RFC3339)}
 }
+func optionalReason(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
 func toSubscriptionResponse(sub *EmployeeSubscription) *SubscriptionResponse {
-	var startsAt, expiresAt *string
+	var startsAt, expiresAt, cancelledAt *string
 	if sub.StartsAt != nil {
 		value := sub.StartsAt.UTC().Format(time.RFC3339)
 		startsAt = &value
@@ -193,5 +292,16 @@ func toSubscriptionResponse(sub *EmployeeSubscription) *SubscriptionResponse {
 		value := sub.ExpiresAt.UTC().Format(time.RFC3339)
 		expiresAt = &value
 	}
-	return &SubscriptionResponse{ID: sub.ID, EmployeeID: sub.EmployeeID, PlanID: sub.PlanID, PlanName: sub.PlanName, Status: sub.Status, StartsAt: startsAt, ExpiresAt: expiresAt, Plan: toPlanResponse(sub.Plan), CreatedAt: sub.CreatedAt.UTC().Format(time.RFC3339), UpdatedAt: sub.UpdatedAt.UTC().Format(time.RFC3339)}
+	if sub.CancelledAt != nil {
+		value := sub.CancelledAt.UTC().Format(time.RFC3339)
+		cancelledAt = &value
+	}
+	return &SubscriptionResponse{
+		ID: sub.ID, EmployeeID: sub.EmployeeID, PlanID: sub.PlanID, PlanName: sub.PlanName,
+		Status: sub.Status, StartsAt: startsAt, ExpiresAt: expiresAt, AutoRenew: sub.AutoRenew,
+		CancelledAt: cancelledAt, CancellationReason: sub.CancellationReason,
+		Plan:      toPlanResponse(sub.Plan),
+		CreatedAt: sub.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt: sub.UpdatedAt.UTC().Format(time.RFC3339),
+	}
 }

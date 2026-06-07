@@ -61,6 +61,21 @@ func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, "Profile updated", res)
 }
 
+func (h *Handler) deactivateMe(w http.ResponseWriter, r *http.Request) {
+	userID, _, ok := h.authContext(w, r)
+	if !ok {
+		return
+	}
+
+	res, err := h.svc.Deactivate(r.Context(), userID)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Account deactivated", res)
+}
+
 func (h *Handler) listAddresses(w http.ResponseWriter, r *http.Request) {
 	userID, role, ok := h.authContext(w, r)
 	if !ok {
@@ -170,6 +185,8 @@ func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
 		response.Error(w, http.StatusNotFound, "User not found", sharederrors.CodeNotFound)
 	case errors.Is(err, ErrAddressNotFound):
 		response.Error(w, http.StatusNotFound, "Address not found", sharederrors.CodeNotFound)
+	case errors.Is(err, ErrDeactivated):
+		response.Error(w, http.StatusConflict, "Account is already deactivated", sharederrors.CodeConflict)
 	default:
 		if h.log != nil {
 			h.log.Error("users request failed", slog.String("error", err.Error()))

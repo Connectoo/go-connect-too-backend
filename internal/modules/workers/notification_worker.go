@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -46,12 +47,24 @@ type RealtimeBroadcaster interface {
 	SendToUser(userID uuid.UUID, payload []byte)
 }
 
+// EmailSender delivers transactional email.
+type EmailSender interface {
+	Send(ctx context.Context, message notifications.EmailMessage) error
+}
+
+// UserEmailLookup resolves user emails by id.
+type UserEmailLookup interface {
+	GetByID(ctx context.Context, id uuid.UUID) (email string, err error)
+}
+
 // NotificationWorker handles platform events and delivers notifications.
 type NotificationWorker struct {
 	customers CustomerProfileStore
 	employees EmployeeProfileStore
+	users     UserEmailLookup
 	notifier  NotificationCreator
 	push      PushSender
+	email     EmailSender
 	chat      ChatConversationEnsurer
 	hub       RealtimeBroadcaster
 	log       *slog.Logger
@@ -67,14 +80,34 @@ func NewNotificationWorker(
 	hub RealtimeBroadcaster,
 	log *slog.Logger,
 ) *NotificationWorker {
+	return NewNotificationWorkerWithEmail(customers, employees, nil, notifier, push, nil, chatSvc, hub, log)
+}
+
+// NewNotificationWorkerWithEmail creates a notification worker with optional email delivery.
+func NewNotificationWorkerWithEmail(
+	customers CustomerProfileStore,
+	employees EmployeeProfileStore,
+	users UserEmailLookup,
+	notifier NotificationCreator,
+	push PushSender,
+	email EmailSender,
+	chatSvc ChatConversationEnsurer,
+	hub RealtimeBroadcaster,
+	log *slog.Logger,
+) *NotificationWorker {
 	if push == nil {
 		push = notifications.NoopPushProvider{}
+	}
+	if email == nil {
+		email = notifications.NoopEmailProvider{}
 	}
 	return &NotificationWorker{
 		customers: customers,
 		employees: employees,
+		users:     users,
 		notifier:  notifier,
 		push:      push,
+		email:     email,
 		chat:      chatSvc,
 		hub:       hub,
 		log:       log,
@@ -158,6 +191,8 @@ func (w *NotificationWorker) handleBookingEvent(ctx context.Context, event event
 
 	w.deliverToUser(ctx, customer.UserID, string(event.Type), title, body, data)
 	w.deliverToUser(ctx, employee.UserID, string(event.Type), title, body, data)
+	w.sendBookingEmail(ctx, customer.UserID, title, body)
+	w.sendBookingEmail(ctx, employee.UserID, title, body)
 }
 
 func (w *NotificationWorker) handleMessageSent(ctx context.Context, event events.Event) {
@@ -251,6 +286,23 @@ func (w *NotificationWorker) deliverToUser(
 		Data:  pushData,
 	}); err != nil {
 		w.log.Error("push notification failed", slog.String("error", err.Error()))
+	}
+}
+
+func (w *NotificationWorker) sendBookingEmail(ctx context.Context, userID uuid.UUID, title, body string) {
+	if w.email == nil || w.users == nil {
+		return
+	}
+	email, err := w.users.GetByID(ctx, userID)
+	if err != nil || strings.TrimSpace(email) == "" {
+		return
+	}
+	if err := w.email.Send(ctx, notifications.EmailMessage{
+		To:      email,
+		Subject: title,
+		Body:    body,
+	}); err != nil {
+		w.log.Error("booking email failed", slog.String("error", err.Error()))
 	}
 }
 

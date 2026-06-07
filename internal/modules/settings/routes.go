@@ -9,10 +9,11 @@ import (
 )
 
 // RegisterRoutes mounts admin settings endpoints.
-func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
+func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager, auditStore middleware.AuditStore) {
 	r.Route("/admin/settings", func(r chi.Router) {
 		r.Use(middleware.Authenticate(tokens))
 		r.Use(middleware.RequireRole(users.RoleAdmin))
+		r.Use(middleware.AdminAudit(auditStore))
 
 		r.Get("/", h.getSettings)
 		r.Put("/", h.updateSettings)

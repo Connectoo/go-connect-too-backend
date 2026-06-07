@@ -3,6 +3,7 @@ package reviews
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -23,7 +24,7 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 const reviewColumns = `
-	id, booking_id, customer_id, employee_id, rating, comment, status, created_at, updated_at`
+	id, booking_id, customer_id, employee_id, rating, comment, review_images, status, created_at, updated_at`
 
 const replyColumns = `
 	id, review_id, employee_id, reply, created_at, updated_at`
@@ -32,9 +33,14 @@ const replyColumns = `
 func (r *Repository) Create(ctx context.Context, review *Review) (*Review, error) {
 	query := `
 		INSERT INTO reviews (
-			id, booking_id, customer_id, employee_id, rating, comment, status, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			id, booking_id, customer_id, employee_id, rating, comment, review_images, status, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING` + reviewColumns
+
+	images, err := encodeReviewImages(review.ReviewImages)
+	if err != nil {
+		return nil, err
+	}
 
 	row := r.db.QueryRowContext(ctx, query,
 		review.ID,
@@ -43,6 +49,7 @@ func (r *Repository) Create(ctx context.Context, review *Review) (*Review, error
 		review.EmployeeID,
 		review.Rating,
 		review.Comment,
+		images,
 		review.Status,
 		review.CreatedAt,
 		review.UpdatedAt,
@@ -254,8 +261,27 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
+func encodeReviewImages(images []string) ([]byte, error) {
+	if images == nil {
+		images = []string{}
+	}
+	return json.Marshal(images)
+}
+
+func decodeReviewImages(raw []byte) ([]string, error) {
+	if len(raw) == 0 {
+		return []string{}, nil
+	}
+	var images []string
+	if err := json.Unmarshal(raw, &images); err != nil {
+		return nil, err
+	}
+	return images, nil
+}
+
 func scanReview(row rowScanner) (*Review, error) {
 	var review Review
+	var imagesRaw []byte
 	err := row.Scan(
 		&review.ID,
 		&review.BookingID,
@@ -263,6 +289,7 @@ func scanReview(row rowScanner) (*Review, error) {
 		&review.EmployeeID,
 		&review.Rating,
 		&review.Comment,
+		&imagesRaw,
 		&review.Status,
 		&review.CreatedAt,
 		&review.UpdatedAt,
@@ -270,6 +297,11 @@ func scanReview(row rowScanner) (*Review, error) {
 	if err != nil {
 		return nil, err
 	}
+	images, err := decodeReviewImages(imagesRaw)
+	if err != nil {
+		return nil, fmt.Errorf("decode review images: %w", err)
+	}
+	review.ReviewImages = images
 	return &review, nil
 }
 

@@ -18,13 +18,15 @@ const (
 
 // User is a platform account.
 type User struct {
-	ID           uuid.UUID
-	Name         string
-	Email        string
-	Phone        *string
-	PasswordHash string
-	Role         string
-	Status       string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              uuid.UUID
+	Name            string
+	Email           string
+	Phone           *string
+	PasswordHash    string
+	Role            string
+	Status          string
+	EmailVerifiedAt *time.Time
+	DeactivatedAt   *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }

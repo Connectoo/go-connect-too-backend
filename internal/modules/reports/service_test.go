@@ -55,6 +55,14 @@ func (m *mockReportStore) ListAdmin(_ context.Context, _ string, _, _ int) ([]Re
 	return items, len(items), nil
 }
 
+func (m *mockReportStore) ListAll(_ context.Context) ([]Report, error) {
+	items := make([]Report, 0, len(m.reports))
+	for _, report := range m.reports {
+		items = append(items, *report)
+	}
+	return items, nil
+}
+
 func (m *mockReportStore) Resolve(_ context.Context, id uuid.UUID, at time.Time) (*Report, error) {
 	report, ok := m.reports[id]
 	if !ok {

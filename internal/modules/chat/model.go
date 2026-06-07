@@ -22,6 +22,8 @@ type Message struct {
 	ConversationID uuid.UUID
 	SenderID       uuid.UUID
 	Message        string
+	AttachmentURL  *string
+	ContentType    *string
 	ReadAt         *time.Time
 	CreatedAt      time.Time
 }

@@ -52,39 +52,55 @@ type EmployeeActionRequest struct {
 	Reason        *string `json:"reason,omitempty"`
 }
 
+// RescheduleBookingRequest changes booking date and time.
+type RescheduleBookingRequest struct {
+	BookingDate string                 `json:"booking_date"`
+	StartTime   availability.TimeOfDay `json:"start_time"`
+	EndTime     availability.TimeOfDay `json:"end_time"`
+	Reason      *string                `json:"reason,omitempty"`
+}
+
+// AdminUpdateStatusRequest forces a booking status change.
+type AdminUpdateStatusRequest struct {
+	Status string  `json:"status"`
+	Reason *string `json:"reason,omitempty"`
+}
+
 // BookingResponse is the API booking payload.
 type BookingResponse struct {
-	ID              uuid.UUID  `json:"id"`
-	CustomerID      uuid.UUID  `json:"customer_id"`
-	EmployeeID      uuid.UUID  `json:"employee_id"`
-	ServiceID       uuid.UUID  `json:"service_id"`
-	BookingDate     string     `json:"booking_date"`
-	StartTime       string     `json:"start_time"`
-	EndTime         string     `json:"end_time"`
-	Status          string     `json:"status"`
-	CustomerNotes   *string    `json:"customer_notes,omitempty"`
-	EmployeeNotes   *string    `json:"employee_notes,omitempty"`
-	TotalAmount     float64    `json:"total_amount"`
-	SourceBookingID *uuid.UUID `json:"source_booking_id,omitempty"`
-	CreatedAt       string     `json:"created_at"`
-	UpdatedAt       string     `json:"updated_at"`
+	ID                uuid.UUID  `json:"id"`
+	CustomerID        uuid.UUID  `json:"customer_id"`
+	EmployeeID        uuid.UUID  `json:"employee_id"`
+	ServiceID         uuid.UUID  `json:"service_id"`
+	BookingDate       string     `json:"booking_date"`
+	StartTime         string     `json:"start_time"`
+	EndTime           string     `json:"end_time"`
+	Status            string     `json:"status"`
+	CustomerNotes     *string    `json:"customer_notes,omitempty"`
+	EmployeeNotes     *string    `json:"employee_notes,omitempty"`
+	TotalAmount       float64    `json:"total_amount"`
+	SourceBookingID   *uuid.UUID `json:"source_booking_id,omitempty"`
+	RescheduledFromID *uuid.UUID `json:"rescheduled_from_id,omitempty"`
+	CreatedAt         string     `json:"created_at"`
+	UpdatedAt         string     `json:"updated_at"`
 }
 
 func toResponse(b *Booking) *BookingResponse {
 	return &BookingResponse{
-		ID:              b.ID,
-		CustomerID:      b.CustomerID,
-		EmployeeID:      b.EmployeeID,
-		ServiceID:       b.ServiceID,
-		BookingDate:     b.BookingDate.Format("2006-01-02"),
-		StartTime:       b.StartTime.String(),
-		EndTime:         b.EndTime.String(),
-		Status:          b.Status,
-		CustomerNotes:   b.CustomerNotes,
-		EmployeeNotes:   b.EmployeeNotes,
-		TotalAmount:     b.TotalAmount,
-		SourceBookingID: b.SourceBookingID,
-		CreatedAt:       b.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:       b.UpdatedAt.UTC().Format(time.RFC3339),
+		ID:                b.ID,
+		CustomerID:        b.CustomerID,
+		EmployeeID:        b.EmployeeID,
+		ServiceID:         b.ServiceID,
+		BookingDate:       b.BookingDate.Format("2006-01-02"),
+		StartTime:         b.StartTime.String(),
+		EndTime:           b.EndTime.String(),
+		Status:            b.Status,
+		CustomerNotes:     b.CustomerNotes,
+		EmployeeNotes:     b.EmployeeNotes,
+		TotalAmount:       b.TotalAmount,
+		SourceBookingID:   b.SourceBookingID,
+		RescheduledFromID: b.RescheduledFromID,
+		CreatedAt:         b.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:         b.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }

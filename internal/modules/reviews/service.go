@@ -147,15 +147,16 @@ func (s *Service) CreateForBooking(ctx context.Context, userID, bookingID uuid.U
 
 	at := s.now()
 	review := &Review{
-		ID:         uuid.New(),
-		BookingID:  bookingID,
-		CustomerID: customer.ID,
-		EmployeeID: booking.EmployeeID,
-		Rating:     req.Rating,
-		Comment:    comment,
-		Status:     StatusPending,
-		CreatedAt:  at,
-		UpdatedAt:  at,
+		ID:           uuid.New(),
+		BookingID:    bookingID,
+		CustomerID:   customer.ID,
+		EmployeeID:   booking.EmployeeID,
+		Rating:       req.Rating,
+		Comment:      comment,
+		ReviewImages: req.ReviewImages,
+		Status:       StatusPending,
+		CreatedAt:    at,
+		UpdatedAt:    at,
 	}
 
 	created, err := s.store.Create(ctx, review)
@@ -350,15 +351,16 @@ func optionalText(value *string, maxLen int) (*string, error) {
 
 func toResponse(review *Review, reply *Reply) *ReviewResponse {
 	res := &ReviewResponse{
-		ID:         review.ID,
-		BookingID:  review.BookingID,
-		CustomerID: review.CustomerID,
-		EmployeeID: review.EmployeeID,
-		Rating:     review.Rating,
-		Comment:    review.Comment,
-		Status:     review.Status,
-		CreatedAt:  review.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:  review.UpdatedAt.UTC().Format(time.RFC3339),
+		ID:           review.ID,
+		BookingID:    review.BookingID,
+		CustomerID:   review.CustomerID,
+		EmployeeID:   review.EmployeeID,
+		Rating:       review.Rating,
+		Comment:      review.Comment,
+		ReviewImages: review.ReviewImages,
+		Status:       review.Status,
+		CreatedAt:    review.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:    review.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 	if reply != nil {
 		res.Reply = &ReplyResponse{

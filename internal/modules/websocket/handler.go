@@ -1,11 +1,13 @@
 package websocket
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
@@ -86,10 +88,34 @@ func (h *Handler) readPump(conn *websocket.Conn, client *Client) {
 	})
 
 	for {
-		if _, _, err := conn.ReadMessage(); err != nil {
+		_, payload, err := conn.ReadMessage()
+		if err != nil {
 			break
 		}
+		h.handleClientMessage(client, payload)
 	}
+}
+
+type clientMessage struct {
+	Type           string `json:"type"`
+	ConversationID string `json:"conversation_id"`
+	RecipientID    string `json:"recipient_user_id"`
+	IsTyping       bool   `json:"is_typing"`
+}
+
+func (h *Handler) handleClientMessage(client *Client, payload []byte) {
+	var msg clientMessage
+	if err := json.Unmarshal(payload, &msg); err != nil {
+		return
+	}
+	if msg.Type != MessageTypeTyping {
+		return
+	}
+	recipientID, err := uuid.Parse(strings.TrimSpace(msg.RecipientID))
+	if err != nil || strings.TrimSpace(msg.ConversationID) == "" {
+		return
+	}
+	h.hub.BroadcastTyping(recipientID, client.UserID, msg.ConversationID, msg.IsTyping)
 }
 
 func (h *Handler) writePump(conn *websocket.Conn, client *Client) {

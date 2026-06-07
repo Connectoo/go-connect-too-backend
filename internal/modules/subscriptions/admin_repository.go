@@ -30,7 +30,8 @@ func (r *Repository) ListAdmin(ctx context.Context, filter AdminListFilter) ([]E
 	limitPos := len(args) + 1
 	offsetPos := len(args) + 2
 	query := `
-		SELECT es.id, es.employee_id, es.plan_id, sp.name, es.status, es.starts_at, es.expires_at, es.created_at, es.updated_at,
+		SELECT es.id, es.employee_id, es.plan_id, sp.name, es.status, es.starts_at, es.expires_at,
+		       es.auto_renew, es.cancelled_at, es.cancellation_reason, es.created_at, es.updated_at,
 		       sp.id, sp.name, sp.price, sp.currency, sp.duration_days, sp.service_limit,
 		       sp.is_featured_allowed, sp.is_priority_allowed, sp.is_active, sp.created_at, sp.updated_at
 		FROM employee_subscriptions es

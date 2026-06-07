@@ -14,15 +14,16 @@ const (
 
 // Review is a customer rating for a completed booking.
 type Review struct {
-	ID         uuid.UUID
-	BookingID  uuid.UUID
-	CustomerID uuid.UUID
-	EmployeeID uuid.UUID
-	Rating     int
-	Comment    *string
-	Status     string
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID           uuid.UUID
+	BookingID    uuid.UUID
+	CustomerID   uuid.UUID
+	EmployeeID   uuid.UUID
+	Rating       int
+	Comment      *string
+	ReviewImages []string
+	Status       string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // Reply is an employee response to a review.

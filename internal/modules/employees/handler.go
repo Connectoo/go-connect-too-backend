@@ -164,6 +164,8 @@ func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
 		response.Error(w, http.StatusBadRequest, "Validation failed", sharederrors.CodeValidationError)
 	case errors.Is(err, ErrNotFound):
 		response.Error(w, http.StatusNotFound, "Employee profile not found", sharederrors.CodeNotFound)
+	case errors.Is(err, ErrKYCNotApproved):
+		response.Error(w, http.StatusConflict, "Employee KYC must be approved first", sharederrors.CodeConflict)
 	default:
 		if h.log != nil {
 			h.log.Error("employee request failed", slog.String("error", err.Error()))

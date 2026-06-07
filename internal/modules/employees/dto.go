@@ -4,17 +4,18 @@ import "github.com/google/uuid"
 
 // UpdateProfileRequest updates the authenticated employee profile.
 type UpdateProfileRequest struct {
-	DisplayName         string   `json:"display_name"`
-	Phone               string   `json:"phone"`
-	Bio                 *string  `json:"bio,omitempty"`
-	ExperienceYears     int      `json:"experience_years"`
-	ProfilePhotoURL     *string  `json:"profile_photo_url,omitempty"`
-	LocationText        *string  `json:"location_text,omitempty"`
-	Latitude            *float64 `json:"latitude,omitempty"`
-	Longitude           *float64 `json:"longitude,omitempty"`
-	ServiceAreaRadiusKm *float64 `json:"service_area_radius_km,omitempty"`
-	Languages           []string `json:"languages"`
-	Skills              []string `json:"skills"`
+	DisplayName         string     `json:"display_name"`
+	Phone               string     `json:"phone"`
+	Bio                 *string    `json:"bio,omitempty"`
+	ExperienceYears     int        `json:"experience_years"`
+	ProfilePhotoURL     *string    `json:"profile_photo_url,omitempty"`
+	ProfilePhotoFileID  *uuid.UUID `json:"profile_photo_file_id,omitempty"`
+	LocationText        *string    `json:"location_text,omitempty"`
+	Latitude            *float64   `json:"latitude,omitempty"`
+	Longitude           *float64   `json:"longitude,omitempty"`
+	ServiceAreaRadiusKm *float64   `json:"service_area_radius_km,omitempty"`
+	Languages           []string   `json:"languages"`
+	Skills              []string   `json:"skills"`
 }
 
 // ProfileResponse is the authenticated employee profile payload.

@@ -5,7 +5,10 @@ import (
 	"time"
 )
 
-const GeneralKey = "general"
+const (
+	GeneralKey  = "general"
+	ProviderKey = "providers"
+)
 
 // Setting is a platform configuration row.
 type Setting struct {

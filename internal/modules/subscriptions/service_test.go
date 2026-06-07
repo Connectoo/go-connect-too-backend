@@ -32,6 +32,15 @@ func (m mockStore) CurrentByEmployeeID(context.Context, uuid.UUID, time.Time) (*
 func (m mockStore) ListAllSubscriptions(context.Context) ([]EmployeeSubscription, error) {
 	return nil, nil
 }
+func (m mockStore) Cancel(context.Context, uuid.UUID, *string, time.Time) (*EmployeeSubscription, error) {
+	return nil, nil
+}
+func (m mockStore) CreatePendingPlanChange(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, time.Time) (*EmployeeSubscription, error) {
+	return nil, nil
+}
+func (m mockStore) SetAutoRenew(context.Context, uuid.UUID, bool, time.Time) (*EmployeeSubscription, error) {
+	return nil, nil
+}
 
 type mockPayments struct{ called bool }
 

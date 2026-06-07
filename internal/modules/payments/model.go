@@ -27,6 +27,24 @@ type Payment struct {
 	UpdatedAt         time.Time
 }
 
+type Refund struct {
+	ID               uuid.UUID
+	PaymentID        uuid.UUID
+	Amount           int64
+	Reason           *string
+	Status           string
+	ProviderRefundID *string
+	CreatedBy        uuid.UUID
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+const (
+	RefundStatusPending   = "pending"
+	RefundStatusCompleted = "completed"
+	RefundStatusFailed    = "failed"
+)
+
 type WebhookEvent struct {
 	ID          uuid.UUID
 	Provider    string

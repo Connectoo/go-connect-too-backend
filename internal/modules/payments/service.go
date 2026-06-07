@@ -23,11 +23,14 @@ type AdminStore interface {
 
 type Store interface {
 	CreateSubscriptionOrder(ctx context.Context, employeeID uuid.UUID, plan PlanSnapshot, order *GatewayOrder, at time.Time) (*Payment, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*Payment, error)
+	GetByIDForEmployee(ctx context.Context, id, employeeID uuid.UUID) (*Payment, error)
 	ListByEmployeeID(ctx context.Context, employeeID uuid.UUID) ([]Payment, error)
 	ListAll(ctx context.Context) ([]Payment, error)
 	InsertWebhookEvent(ctx context.Context, event *WebhookEvent) (bool, error)
 	MarkWebhookProcessed(ctx context.Context, eventID uuid.UUID, at time.Time) error
 	ActivateByProviderOrder(ctx context.Context, provider, providerOrderID, providerPaymentID string, raw []byte, at time.Time) error
+	CreateRefund(ctx context.Context, refund *Refund, at time.Time) (*Refund, error)
 }
 
 type Service struct {
@@ -90,6 +93,103 @@ func (s *Service) ListAll(ctx context.Context, status string, page pagination.Pa
 		return pagination.Result[PaymentResponse]{}, err
 	}
 	return pagination.NewResult(toResponses(items), page, len(items)), nil
+}
+
+func (s *Service) VerifySubscriptionPayment(ctx context.Context, employeeID uuid.UUID, req VerifyPaymentInput) (*PaymentResponse, error) {
+	if req.PaymentID == uuid.Nil {
+		return nil, fmt.Errorf("%w: payment_id is required", ErrValidation)
+	}
+	if strings.TrimSpace(req.ProviderOrderID) == "" || strings.TrimSpace(req.ProviderPaymentID) == "" || strings.TrimSpace(req.Signature) == "" {
+		return nil, fmt.Errorf("%w: provider_order_id, provider_payment_id, and signature are required", ErrValidation)
+	}
+	if !s.razorpay.VerifyPayment(req.ProviderOrderID, req.ProviderPaymentID, req.Signature) {
+		return nil, ErrInvalidSignature
+	}
+
+	payment, err := s.store.GetByIDForEmployee(ctx, req.PaymentID, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	if payment.ProviderOrderID != req.ProviderOrderID {
+		return nil, fmt.Errorf("%w: provider order mismatch", ErrValidation)
+	}
+	if payment.Status != StatusPending {
+		return nil, ErrPaymentNotPending
+	}
+
+	raw, _ := json.Marshal(map[string]string{
+		"provider_payment_id": req.ProviderPaymentID,
+		"verified_by":         "client",
+	})
+	if err := s.store.ActivateByProviderOrder(ctx, ProviderRazorpay, req.ProviderOrderID, req.ProviderPaymentID, raw, s.now()); err != nil {
+		return nil, err
+	}
+
+	updated, err := s.store.GetByID(ctx, payment.ID)
+	if err != nil {
+		return nil, err
+	}
+	return toResponse(updated), nil
+}
+
+func (s *Service) Refund(ctx context.Context, adminUserID, paymentID uuid.UUID, req RefundRequest) (*RefundResponse, error) {
+	payment, err := s.store.GetByID(ctx, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	if payment.Status != StatusSuccess {
+		return nil, ErrPaymentNotRefundable
+	}
+
+	amount := payment.Amount
+	if req.Amount != nil {
+		if *req.Amount <= 0 || *req.Amount > payment.Amount {
+			return nil, fmt.Errorf("%w: invalid refund amount", ErrValidation)
+		}
+		amount = *req.Amount
+	}
+
+	reason := optionalRefundReason(req.Reason)
+	at := s.now()
+	refund := &Refund{
+		ID:        uuid.New(),
+		PaymentID: payment.ID,
+		Amount:    amount,
+		Reason:    reason,
+		Status:    RefundStatusCompleted,
+		CreatedBy: adminUserID,
+		CreatedAt: at,
+		UpdatedAt: at,
+	}
+
+	created, err := s.store.CreateRefund(ctx, refund, at)
+	if err != nil {
+		return nil, err
+	}
+	return toRefundResponse(created), nil
+}
+
+func optionalRefundReason(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func toRefundResponse(refund *Refund) *RefundResponse {
+	return &RefundResponse{
+		ID:        refund.ID,
+		PaymentID: refund.PaymentID,
+		Amount:    refund.Amount,
+		Reason:    refund.Reason,
+		Status:    refund.Status,
+		CreatedAt: refund.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt: refund.UpdatedAt.UTC().Format(time.RFC3339),
+	}
 }
 
 func (s *Service) ProcessRazorpayWebhook(ctx context.Context, payload []byte, signature, eventID string) error {

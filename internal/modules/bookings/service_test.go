@@ -139,6 +139,20 @@ func (m *mockBookingStore) EmployeeIsAvailable(context.Context, uuid.UUID, int, 
 	return m.available, nil
 }
 
+func (m *mockBookingStore) Reschedule(_ context.Context, bookingID uuid.UUID, bookingDate time.Time, start, end availability.TimeOfDay, _ uuid.UUID, _ *string, at time.Time) (*Booking, error) {
+	booking, ok := m.bookings[bookingID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	updated := *booking
+	updated.BookingDate = bookingDate
+	updated.StartTime = start
+	updated.EndTime = end
+	updated.UpdatedAt = at
+	m.bookings[bookingID] = &updated
+	return &updated, nil
+}
+
 func newTestService(t *testing.T, customers CustomerProfileStore, employees EmployeeProfileStore, catalog ServiceCatalog, store Store) *Service {
 	t.Helper()
 	svc := NewService(customers, employees, catalog, store, NoopEventPublisher{})

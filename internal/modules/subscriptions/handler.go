@@ -99,6 +99,84 @@ func (h *Handler) updatePlan(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, "Subscription plan updated", res)
 }
 
+func (h *Handler) cancel(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+	var req CancelSubscriptionRequest
+	if r.ContentLength > 0 {
+		if err := decodeJSON(r, &req); err != nil {
+			response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+			return
+		}
+	}
+	res, err := h.svc.Cancel(r.Context(), userID, req)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Subscription cancelled", res)
+}
+
+func (h *Handler) changePlan(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+	var req ChangePlanRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+	res, err := h.svc.ChangePlan(r.Context(), userID, req)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusCreated, "Plan change initiated", res)
+}
+
+func (h *Handler) setAutoRenew(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+	var req AutoRenewRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+	res, err := h.svc.SetAutoRenew(r.Context(), userID, req)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Auto-renew updated", res)
+}
+
+func (h *Handler) verifyPayment(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+	var req VerifyPaymentRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+	res, err := h.svc.VerifyPayment(r.Context(), userID, req)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, "Payment verified", res)
+}
+
 func (h *Handler) listSubscriptions(w http.ResponseWriter, r *http.Request) {
 	page := pagination.Parse(r.URL.Query())
 	res, err := h.svc.ListSubscriptions(r.Context(), r.URL.Query().Get("status"), page)
@@ -123,6 +201,12 @@ func (h *Handler) writeError(w http.ResponseWriter, err error) {
 		response.Error(w, http.StatusNotFound, "Subscription resource not found", sharederrors.CodeNotFound)
 	case errors.Is(err, ErrPlanInactive):
 		response.Error(w, http.StatusConflict, "Subscription plan is inactive", sharederrors.CodeConflict)
+	case errors.Is(err, ErrNoActive), errors.Is(err, ErrAlreadyCancelled):
+		response.Error(w, http.StatusConflict, "Subscription cannot be changed", sharederrors.CodeConflict)
+	case errors.Is(err, ErrInvalidSignature):
+		response.Error(w, http.StatusBadRequest, "Invalid payment signature", sharederrors.CodeValidationError)
+	case errors.Is(err, ErrPaymentNotPending), errors.Is(err, payments.ErrPaymentNotPending):
+		response.Error(w, http.StatusConflict, "Payment is not pending", sharederrors.CodeConflict)
 	case errors.Is(err, payments.ErrGatewayNotConfigured):
 		response.Error(w, http.StatusConflict, "Payment gateway is not configured", sharederrors.CodeConflict)
 	default:

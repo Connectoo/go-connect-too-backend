@@ -239,6 +239,33 @@ func normalizePhone(phone *string) *string {
 	return &trimmed
 }
 
+// UserDeactivator deactivates user accounts.
+type UserDeactivator interface {
+	Deactivate(ctx context.Context, id uuid.UUID, at time.Time) (*User, error)
+}
+
+// Deactivate deactivates the authenticated user's account.
+func (s *Service) Deactivate(ctx context.Context, userID uuid.UUID) (*ProfileResponse, error) {
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if user.DeactivatedAt != nil {
+		return nil, ErrDeactivated
+	}
+
+	deactivator, ok := s.users.(UserDeactivator)
+	if !ok {
+		return nil, fmt.Errorf("%w: deactivate not configured", ErrValidation)
+	}
+
+	updated, err := deactivator.Deactivate(ctx, userID, s.now())
+	if err != nil {
+		return nil, err
+	}
+	return toProfileResponse(updated), nil
+}
+
 func toProfileResponse(user *User) *ProfileResponse {
 	return &ProfileResponse{
 		ID:        user.ID,

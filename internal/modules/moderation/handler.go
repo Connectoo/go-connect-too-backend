@@ -10,12 +10,9 @@ import (
 
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/reports"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/reviews"
-	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
 	sharederrors "github.com/MustafaKheda/go-connect-too-backend/internal/shared/errors"
-	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/middleware"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/response"
-	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/security"
 )
 
 func (h *Handler) listReviews(w http.ResponseWriter, r *http.Request) {
@@ -107,24 +104,4 @@ func (h *Handler) writeReportError(w http.ResponseWriter, err error) {
 		}
 		response.Error(w, http.StatusInternalServerError, "Something went wrong", sharederrors.CodeInternalError)
 	}
-}
-
-// RegisterRoutes mounts admin moderation endpoints.
-func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
-	r.Route("/admin/reviews", func(r chi.Router) {
-		r.Use(middleware.Authenticate(tokens))
-		r.Use(middleware.RequireRole(users.RoleAdmin))
-
-		r.Get("/", h.listReviews)
-		r.Patch("/{id}/approve", h.approveReview)
-		r.Patch("/{id}/hide", h.hideReview)
-	})
-
-	r.Route("/admin/reports", func(r chi.Router) {
-		r.Use(middleware.Authenticate(tokens))
-		r.Use(middleware.RequireRole(users.RoleAdmin))
-
-		r.Get("/", h.listReports)
-		r.Patch("/{id}/resolve", h.resolveReport)
-	})
 }

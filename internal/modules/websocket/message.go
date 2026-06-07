@@ -5,6 +5,7 @@ import "encoding/json"
 const (
 	MessageTypeNotification = "notification"
 	MessageTypeChatMessage  = "chat.message"
+	MessageTypeTyping       = "chat.typing"
 )
 
 // Message is sent to connected clients over WebSocket.

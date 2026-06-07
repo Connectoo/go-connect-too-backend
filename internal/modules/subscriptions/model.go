@@ -28,14 +28,35 @@ type Plan struct {
 }
 
 type EmployeeSubscription struct {
-	ID         uuid.UUID
-	EmployeeID uuid.UUID
-	PlanID     uuid.UUID
-	PlanName   string
-	Status     string
-	StartsAt   *time.Time
-	ExpiresAt  *time.Time
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	Plan       *Plan
+	ID                 uuid.UUID
+	EmployeeID         uuid.UUID
+	PlanID             uuid.UUID
+	PlanName           string
+	Status             string
+	StartsAt           *time.Time
+	ExpiresAt          *time.Time
+	AutoRenew          bool
+	CancelledAt        *time.Time
+	CancellationReason *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Plan               *Plan
 }
+
+// SubscriptionChange records subscription lifecycle audit events.
+type SubscriptionChange struct {
+	ID             uuid.UUID
+	SubscriptionID uuid.UUID
+	EmployeeID     uuid.UUID
+	ChangeType     string
+	OldPlanID      *uuid.UUID
+	NewPlanID      *uuid.UUID
+	Reason         *string
+	CreatedAt      time.Time
+}
+
+const (
+	ChangeTypeCancel     = "cancel"
+	ChangeTypeChangePlan = "change_plan"
+	ChangeTypeAutoRenew  = "auto_renew"
+)

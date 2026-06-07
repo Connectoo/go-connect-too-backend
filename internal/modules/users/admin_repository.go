@@ -34,7 +34,7 @@ func (r *Repository) List(ctx context.Context, filter ListFilter) ([]User, int, 
 	limitPos := len(args) + 1
 	offsetPos := len(args) + 2
 	query := `
-		SELECT id, name, email, phone, password_hash, role, status, created_at, updated_at
+		SELECT ` + userColumns + `
 		FROM users` + where + fmt.Sprintf(`
 		ORDER BY created_at DESC
 		LIMIT $%d OFFSET $%d`, limitPos, offsetPos)
@@ -69,10 +69,10 @@ func (r *Repository) UpdateStatus(ctx context.Context, id uuid.UUID, status stri
 		SET status = $2,
 		    updated_at = $3
 		WHERE id = $1
-		RETURNING id, name, email, phone, password_hash, role, status, created_at, updated_at`
+		RETURNING ` + userColumns
 
 	row := r.db.QueryRowContext(ctx, query, id, status, at)
-	updated, err := scanUser(row)
+	updated, err := scanUserRow(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -83,22 +83,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, id uuid.UUID, status stri
 }
 
 func scanUserFromRows(row *sql.Rows) (*User, error) {
-	var user User
-	err := row.Scan(
-		&user.ID,
-		&user.Name,
-		&user.Email,
-		&user.Phone,
-		&user.PasswordHash,
-		&user.Role,
-		&user.Status,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
+	return scanUserRow(row)
 }
 
 func buildUserListWhere(filter ListFilter) (string, []any) {

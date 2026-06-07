@@ -2,8 +2,10 @@ package reports
 
 import (
 	"context"
+	"encoding/csv"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -27,6 +29,7 @@ type Store interface {
 	Create(ctx context.Context, report *Report) (*Report, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*Report, error)
 	ListAdmin(ctx context.Context, status string, offset, limit int) ([]Report, int, error)
+	ListAll(ctx context.Context) ([]Report, error)
 	Resolve(ctx context.Context, id uuid.UUID, at time.Time) (*Report, error)
 }
 
@@ -113,6 +116,48 @@ func (s *Service) ListForAdmin(ctx context.Context, status string, page paginati
 		out = append(out, *toResponse(&items[i]))
 	}
 	return pagination.NewResult(out, page, total), nil
+}
+
+// ExportCSV streams all reports as CSV.
+func (s *Service) ExportCSV(ctx context.Context, w io.Writer) error {
+	items, err := s.store.ListAll(ctx)
+	if err != nil {
+		return err
+	}
+
+	writer := csv.NewWriter(w)
+	if err := writer.Write([]string{
+		"id", "reporter_id", "reported_user_id", "booking_id", "reason", "description", "status", "created_at", "updated_at",
+	}); err != nil {
+		return fmt.Errorf("write csv header: %w", err)
+	}
+
+	for i := range items {
+		report := items[i]
+		bookingID := ""
+		if report.BookingID != nil {
+			bookingID = report.BookingID.String()
+		}
+		description := ""
+		if report.Description != nil {
+			description = *report.Description
+		}
+		if err := writer.Write([]string{
+			report.ID.String(),
+			report.ReporterID.String(),
+			report.ReportedUserID.String(),
+			bookingID,
+			report.Reason,
+			description,
+			report.Status,
+			report.CreatedAt.UTC().Format(time.RFC3339),
+			report.UpdatedAt.UTC().Format(time.RFC3339),
+		}); err != nil {
+			return fmt.Errorf("write csv row: %w", err)
+		}
+	}
+	writer.Flush()
+	return writer.Error()
 }
 
 // Resolve marks a report as resolved.

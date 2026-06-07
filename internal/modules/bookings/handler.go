@@ -202,6 +202,102 @@ func (h *Handler) complete(w http.ResponseWriter, r *http.Request) {
 	}, "Booking completed")
 }
 
+func (h *Handler) rescheduleCustomer(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+
+	bookingID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid booking id", sharederrors.CodeValidationError)
+		return
+	}
+
+	var req RescheduleBookingRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.RescheduleForCustomer(r.Context(), userID, bookingID, req)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Booking rescheduled", res)
+}
+
+func (h *Handler) rescheduleEmployee(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+
+	bookingID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid booking id", sharederrors.CodeValidationError)
+		return
+	}
+
+	var req RescheduleBookingRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.RescheduleForEmployee(r.Context(), userID, bookingID, req)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Booking rescheduled", res)
+}
+
+func (h *Handler) cancelEmployee(w http.ResponseWriter, r *http.Request) {
+	h.employeeAction(w, r, func(ctx context.Context, userID, bookingID uuid.UUID, req EmployeeActionRequest) (*BookingResponse, error) {
+		return h.svc.CancelForEmployee(ctx, userID, bookingID, req)
+	}, "Booking cancelled")
+}
+
+func (h *Handler) noShowEmployee(w http.ResponseWriter, r *http.Request) {
+	h.employeeAction(w, r, func(ctx context.Context, userID, bookingID uuid.UUID, req EmployeeActionRequest) (*BookingResponse, error) {
+		return h.svc.NoShowForEmployee(ctx, userID, bookingID, req)
+	}, "Booking marked as no-show")
+}
+
+func (h *Handler) updateStatusAdmin(w http.ResponseWriter, r *http.Request) {
+	adminUserID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+
+	bookingID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid booking id", sharederrors.CodeValidationError)
+		return
+	}
+
+	var req AdminUpdateStatusRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.UpdateStatusForAdmin(r.Context(), adminUserID, bookingID, req)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Booking status updated", res)
+}
+
 func (h *Handler) listAdmin(w http.ResponseWriter, r *http.Request) {
 	page := pagination.Parse(r.URL.Query())
 	res, err := h.svc.ListForAdmin(r.Context(), r.URL.Query().Get("status"), page)

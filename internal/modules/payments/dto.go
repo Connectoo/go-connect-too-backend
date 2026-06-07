@@ -20,6 +20,28 @@ type CreateSubscriptionOrderResponse struct {
 	RazorpayKeyID   string    `json:"razorpay_key_id,omitempty"`
 }
 
+type VerifyPaymentInput struct {
+	PaymentID         uuid.UUID
+	ProviderOrderID   string
+	ProviderPaymentID string
+	Signature         string
+}
+
+type RefundRequest struct {
+	Amount *int64  `json:"amount,omitempty"`
+	Reason *string `json:"reason,omitempty"`
+}
+
+type RefundResponse struct {
+	ID        uuid.UUID `json:"id"`
+	PaymentID uuid.UUID `json:"payment_id"`
+	Amount    int64     `json:"amount"`
+	Reason    *string   `json:"reason,omitempty"`
+	Status    string    `json:"status"`
+	CreatedAt string    `json:"created_at"`
+	UpdatedAt string    `json:"updated_at"`
+}
+
 type PaymentResponse struct {
 	ID                uuid.UUID `json:"id"`
 	EmployeeID        uuid.UUID `json:"employee_id"`

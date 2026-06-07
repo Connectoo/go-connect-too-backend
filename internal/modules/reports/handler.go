@@ -44,11 +44,16 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusCreated, "Report submitted", res)
 }
 
-func (h *Handler) exportPlaceholder(w http.ResponseWriter, r *http.Request) {
-	response.JSON(w, http.StatusOK, "Export not available yet", map[string]string{
-		"status":  "placeholder",
-		"message": "CSV and PDF exports will be added in a later phase",
-	})
+func (h *Handler) exportCSV(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", `attachment; filename="reports.csv"`)
+	if err := h.svc.ExportCSV(r.Context(), w); err != nil {
+		if h.log != nil {
+			h.log.Error("report export failed", slog.String("error", err.Error()))
+		}
+		response.Error(w, http.StatusInternalServerError, "Export failed", sharederrors.CodeInternalError)
+		return
+	}
 }
 
 func decodeJSON(r *http.Request, dst interface{}) error {

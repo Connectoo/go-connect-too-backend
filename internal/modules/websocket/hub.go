@@ -72,6 +72,22 @@ func (h *Hub) SendToUser(userID uuid.UUID, payload []byte) {
 	}
 }
 
+// BroadcastTyping notifies a recipient that a user is typing in a conversation.
+func (h *Hub) BroadcastTyping(recipientID, senderID uuid.UUID, conversationID string, isTyping bool) {
+	payload, err := Encode(Message{
+		Type: MessageTypeTyping,
+		Payload: map[string]any{
+			"conversation_id": conversationID,
+			"sender_id":       senderID.String(),
+			"is_typing":       isTyping,
+		},
+	})
+	if err != nil {
+		return
+	}
+	h.SendToUser(recipientID, payload)
+}
+
 // ConnectionCount returns active connections for a user.
 func (h *Hub) ConnectionCount(userID uuid.UUID) int {
 	h.mu.RLock()

@@ -9,10 +9,11 @@ import (
 )
 
 // RegisterRoutes mounts admin dashboard and user management endpoints.
-func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
+func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager, auditStore middleware.AuditStore) {
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(middleware.Authenticate(tokens))
 		r.Use(middleware.RequireRole(users.RoleAdmin))
+		r.Use(middleware.AdminAudit(auditStore))
 
 		r.Get("/dashboard/summary", h.dashboardSummary)
 

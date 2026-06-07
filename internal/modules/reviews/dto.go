@@ -4,8 +4,9 @@ import "github.com/google/uuid"
 
 // CreateReviewRequest creates a review for a completed booking.
 type CreateReviewRequest struct {
-	Rating  int     `json:"rating"`
-	Comment *string `json:"comment,omitempty"`
+	Rating       int      `json:"rating"`
+	Comment      *string  `json:"comment,omitempty"`
+	ReviewImages []string `json:"review_images,omitempty"`
 }
 
 // ReplyRequest is an employee reply to a review.
@@ -15,16 +16,17 @@ type ReplyRequest struct {
 
 // ReviewResponse is the API payload for a review.
 type ReviewResponse struct {
-	ID         uuid.UUID      `json:"id"`
-	BookingID  uuid.UUID      `json:"booking_id"`
-	CustomerID uuid.UUID      `json:"customer_id"`
-	EmployeeID uuid.UUID      `json:"employee_id"`
-	Rating     int            `json:"rating"`
-	Comment    *string        `json:"comment,omitempty"`
-	Status     string         `json:"status"`
-	Reply      *ReplyResponse `json:"reply,omitempty"`
-	CreatedAt  string         `json:"created_at"`
-	UpdatedAt  string         `json:"updated_at"`
+	ID           uuid.UUID      `json:"id"`
+	BookingID    uuid.UUID      `json:"booking_id"`
+	CustomerID   uuid.UUID      `json:"customer_id"`
+	EmployeeID   uuid.UUID      `json:"employee_id"`
+	Rating       int            `json:"rating"`
+	Comment      *string        `json:"comment,omitempty"`
+	ReviewImages []string       `json:"review_images,omitempty"`
+	Status       string         `json:"status"`
+	Reply        *ReplyResponse `json:"reply,omitempty"`
+	CreatedAt    string         `json:"created_at"`
+	UpdatedAt    string         `json:"updated_at"`
 }
 
 // ReplyResponse is the API payload for a review reply.

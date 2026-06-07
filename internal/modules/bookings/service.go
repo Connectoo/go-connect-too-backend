@@ -44,6 +44,7 @@ type AdminStore interface {
 type Store interface {
 	Create(ctx context.Context, booking *Booking, changedByUserID uuid.UUID) (*Booking, error)
 	UpdateStatus(ctx context.Context, bookingID uuid.UUID, newStatus string, changedByUserID uuid.UUID, reason, employeeNotes *string, at time.Time) (*Booking, error)
+	Reschedule(ctx context.Context, bookingID uuid.UUID, bookingDate time.Time, start, end availability.TimeOfDay, changedByUserID uuid.UUID, reason *string, at time.Time) (*Booking, error)
 	GetByID(ctx context.Context, bookingID uuid.UUID) (*Booking, error)
 	ListByCustomerID(ctx context.Context, customerID uuid.UUID) ([]Booking, error)
 	ListByEmployeeID(ctx context.Context, employeeID uuid.UUID) ([]Booking, error)
@@ -365,6 +366,80 @@ func (s *Service) Complete(ctx context.Context, userID, bookingID uuid.UUID, req
 	return s.employeeTransition(ctx, userID, bookingID, StatusCompleted, ActionEmployeeComplete, req)
 }
 
+// RescheduleForCustomer reschedules a booking owned by the authenticated customer.
+func (s *Service) RescheduleForCustomer(ctx context.Context, userID, bookingID uuid.UUID, req RescheduleBookingRequest) (*BookingResponse, error) {
+	customer, err := s.customers.GetByUserID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, customers.ErrNotFound) {
+			return nil, ErrCustomerProfileNotFound
+		}
+		return nil, err
+	}
+
+	booking, err := s.store.GetByID(ctx, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	if booking.CustomerID != customer.ID {
+		return nil, ErrForbidden
+	}
+
+	return s.reschedule(ctx, booking, userID, ActionCustomerReschedule, req)
+}
+
+// RescheduleForEmployee reschedules a booking assigned to the authenticated employee.
+func (s *Service) RescheduleForEmployee(ctx context.Context, userID, bookingID uuid.UUID, req RescheduleBookingRequest) (*BookingResponse, error) {
+	profile, err := s.employees.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	booking, err := s.store.GetByID(ctx, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	if booking.EmployeeID != profile.ID {
+		return nil, ErrForbidden
+	}
+
+	return s.reschedule(ctx, booking, userID, ActionEmployeeReschedule, req)
+}
+
+// CancelForEmployee cancels a booking assigned to the authenticated employee.
+func (s *Service) CancelForEmployee(ctx context.Context, userID, bookingID uuid.UUID, req EmployeeActionRequest) (*BookingResponse, error) {
+	return s.employeeTransition(ctx, userID, bookingID, StatusCancelled, ActionEmployeeCancel, req)
+}
+
+// NoShowForEmployee marks a booking as no-show.
+func (s *Service) NoShowForEmployee(ctx context.Context, userID, bookingID uuid.UUID, req EmployeeActionRequest) (*BookingResponse, error) {
+	return s.employeeTransition(ctx, userID, bookingID, StatusNoShow, ActionEmployeeNoShow, req)
+}
+
+// UpdateStatusForAdmin forces a booking status change with reason.
+func (s *Service) UpdateStatusForAdmin(ctx context.Context, adminUserID, bookingID uuid.UUID, req AdminUpdateStatusRequest) (*BookingResponse, error) {
+	newStatus := strings.TrimSpace(req.Status)
+	if newStatus == "" {
+		return nil, fmt.Errorf("%w: status is required", ErrValidation)
+	}
+
+	reason, err := optionalNotes(req.Reason)
+	if err != nil {
+		return nil, err
+	}
+
+	booking, err := s.store.GetByID(ctx, bookingID)
+	if err != nil {
+		return nil, err
+	}
+
+	updated, err := s.transition(ctx, booking, newStatus, ActionAdminUpdateStatus, adminUserID, reason, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return toResponse(updated), nil
+}
+
 // ListForAdmin returns paginated bookings for admin views.
 func (s *Service) ListForAdmin(ctx context.Context, status string, page pagination.Params) (pagination.Result[BookingResponse], error) {
 	adminStore, ok := s.store.(AdminStore)
@@ -432,6 +507,61 @@ func (s *Service) employeeTransition(
 
 	s.events.Publish(ctx, employeeEvent(action, updated))
 	return toResponse(updated), nil
+}
+
+func (s *Service) reschedule(
+	ctx context.Context,
+	booking *Booking,
+	userID uuid.UUID,
+	action TransitionAction,
+	req RescheduleBookingRequest,
+) (*BookingResponse, error) {
+	if !CanReschedule(booking.Status) {
+		return nil, fmt.Errorf("%w: booking status is %s", ErrInvalidStatusTransition, booking.Status)
+	}
+
+	bookingDate, start, end, err := validateRescheduleRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensureBookingDateNotPast(bookingDate, s.now()); err != nil {
+		return nil, err
+	}
+
+	available, err := s.store.EmployeeIsAvailable(ctx, booking.EmployeeID, int(bookingDate.Weekday()), start, end)
+	if err != nil {
+		return nil, err
+	}
+	if !available {
+		return nil, ErrEmployeeUnavailable
+	}
+
+	reason, err := optionalNotes(req.Reason)
+	if err != nil {
+		return nil, err
+	}
+
+	_ = action
+	updated, err := s.store.Reschedule(ctx, booking.ID, bookingDate, start, end, userID, reason, s.now())
+	if err != nil {
+		if errors.Is(err, ErrDoubleBooking) {
+			return nil, ErrDoubleBooking
+		}
+		return nil, err
+	}
+
+	return toResponse(updated), nil
+}
+
+func validateRescheduleRequest(req RescheduleBookingRequest) (time.Time, availability.TimeOfDay, availability.TimeOfDay, error) {
+	bookingDate, err := parseBookingDate(req.BookingDate)
+	if err != nil {
+		return time.Time{}, availability.TimeOfDay{}, availability.TimeOfDay{}, err
+	}
+	if !req.StartTime.Before(req.EndTime) {
+		return time.Time{}, availability.TimeOfDay{}, availability.TimeOfDay{}, fmt.Errorf("%w: end_time must be after start_time", ErrValidation)
+	}
+	return bookingDate, req.StartTime, req.EndTime, nil
 }
 
 func (s *Service) transition(

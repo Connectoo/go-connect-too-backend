@@ -15,5 +15,6 @@ func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
 		r.Get("/conversations", h.listConversations)
 		r.Get("/conversations/{id}/messages", h.listMessages)
 		r.Post("/conversations/{id}/messages", h.sendMessage)
+		r.Patch("/conversations/{id}/messages/{messageId}/read", h.markMessageRead)
 	})
 }

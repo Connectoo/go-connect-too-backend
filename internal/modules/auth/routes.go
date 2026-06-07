@@ -17,10 +17,15 @@ func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
 		r.Post("/login/admin", h.loginAdmin)
 		r.Post("/refresh", h.refresh)
 		r.Post("/logout", h.logout)
+		r.Post("/forgot-password", h.forgotPassword)
+		r.Post("/reset-password", h.resetPassword)
+		r.Post("/verify-email", h.verifyEmail)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Authenticate(tokens))
 			r.Get("/me", h.me)
+			r.Post("/resend-verification", h.resendVerification)
+			r.Post("/change-password", h.changePassword)
 		})
 	})
 }

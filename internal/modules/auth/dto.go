@@ -34,6 +34,29 @@ type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// ForgotPasswordRequest starts a password reset flow.
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+// ResetPasswordRequest completes a password reset flow.
+type ResetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
+// VerifyEmailRequest verifies a user's email address.
+type VerifyEmailRequest struct {
+	Token string `json:"token"`
+}
+
+// ChangePasswordRequest updates the authenticated user's password.
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 // TokenPair is returned after login, register, or refresh.
 type TokenPair struct {
 	AccessToken      string `json:"access_token"`

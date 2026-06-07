@@ -2,12 +2,14 @@ package employees
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/storage"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/users"
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 )
@@ -38,13 +40,25 @@ type UserStatusStore interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string, at time.Time) error
 }
 
+// KYCStatusChecker verifies employee KYC approval before profile approval.
+type KYCStatusChecker interface {
+	GetStatusByEmployeeID(ctx context.Context, employeeID uuid.UUID) (string, error)
+}
+
 // Service handles employee profile business logic.
 type Service struct {
 	profiles     ProfileStore
 	users        UserStatusStore
+	kyc          KYCStatusChecker
+	files        ProfileFileResolver
 	badges       BadgeReader
 	profileViews ProfileViewRecorder
 	now          func() time.Time
+}
+
+// ProfileFileResolver resolves owned uploaded file keys for profile photos.
+type ProfileFileResolver interface {
+	ResolveFileURL(ctx context.Context, userID, fileID uuid.UUID) (string, error)
 }
 
 // NewService creates an employee profile service.
@@ -58,6 +72,18 @@ func NewService(profiles ProfileStore, users ...UserStatusStore) *Service {
 		users:    userStore,
 		now:      func() time.Time { return time.Now().UTC() },
 	}
+}
+
+// WithKYCChecker configures KYC status checks for profile approval.
+func (s *Service) WithKYCChecker(checker KYCStatusChecker) *Service {
+	s.kyc = checker
+	return s
+}
+
+// WithProfileFiles configures uploaded file resolution for profile photos.
+func (s *Service) WithProfileFiles(resolver ProfileFileResolver) *Service {
+	s.files = resolver
+	return s
 }
 
 // WithBadges configures badge loading for public profiles.
@@ -110,12 +136,17 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, req Updat
 	displayName := strings.TrimSpace(req.DisplayName)
 	phone := strings.TrimSpace(req.Phone)
 
+	profilePhotoURL, err := s.resolveProfilePhoto(ctx, userID, req.ProfilePhotoURL, req.ProfilePhotoFileID)
+	if err != nil {
+		return nil, err
+	}
+
 	updated, err := s.profiles.UpdateByUserID(ctx, userID, &Profile{
 		DisplayName:         &displayName,
 		Phone:               &phone,
 		Bio:                 trimOptionalString(req.Bio),
 		ExperienceYears:     req.ExperienceYears,
-		ProfilePhotoURL:     trimOptionalString(req.ProfilePhotoURL),
+		ProfilePhotoURL:     profilePhotoURL,
 		LocationText:        trimOptionalString(req.LocationText),
 		Latitude:            req.Latitude,
 		Longitude:           req.Longitude,
@@ -133,6 +164,16 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, req Updat
 
 // ApproveProfile marks an employee profile as approved.
 func (s *Service) ApproveProfile(ctx context.Context, profileID uuid.UUID) (*ProfileResponse, error) {
+	if s.kyc != nil {
+		status, err := s.kyc.GetStatusByEmployeeID(ctx, profileID)
+		if err != nil {
+			return nil, err
+		}
+		if status != "approved" {
+			return nil, ErrKYCNotApproved
+		}
+	}
+
 	profile, err := s.profiles.UpdateVerificationStatus(ctx, profileID, VerificationApproved, s.now())
 	if err != nil {
 		return nil, err
@@ -234,6 +275,30 @@ func trimOptionalString(value *string) *string {
 		return nil
 	}
 	return &trimmed
+}
+
+func (s *Service) resolveProfilePhoto(ctx context.Context, userID uuid.UUID, rawURL *string, fileID *uuid.UUID) (*string, error) {
+	if fileID != nil {
+		if s.files == nil {
+			return nil, fmt.Errorf("%w: file storage is not configured", ErrValidation)
+		}
+		url, err := s.files.ResolveFileURL(ctx, userID, *fileID)
+		if err != nil {
+			return nil, mapStorageFileError(err)
+		}
+		return &url, nil
+	}
+	return trimOptionalString(rawURL), nil
+}
+
+func mapStorageFileError(err error) error {
+	if errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("%w: uploaded file not found", ErrValidation)
+	}
+	if errors.Is(err, storage.ErrForbidden) {
+		return fmt.Errorf("%w: uploaded file not owned by user", ErrValidation)
+	}
+	return err
 }
 
 func normalizeStringList(values []string) []string {

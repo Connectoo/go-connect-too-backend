@@ -26,7 +26,7 @@ func NewRepository(db *sql.DB) *Repository {
 
 const bookingColumns = `
 	id, customer_id, employee_id, service_id, booking_date, start_time, end_time,
-	status, customer_notes, employee_notes, total_amount, source_booking_id, created_at, updated_at`
+	status, customer_notes, employee_notes, total_amount, source_booking_id, rescheduled_from_id, created_at, updated_at`
 
 // Create inserts a booking and its initial status history inside a transaction.
 func (r *Repository) Create(ctx context.Context, booking *Booking, changedByUserID uuid.UUID) (*Booking, error) {
@@ -212,9 +212,9 @@ func insertBookingInTx(ctx context.Context, tx *sql.Tx, booking *Booking) (*Book
 	query := `
 		INSERT INTO bookings (
 			id, customer_id, employee_id, service_id, booking_date, start_time, end_time,
-			status, customer_notes, employee_notes, total_amount, source_booking_id, created_at, updated_at
+			status, customer_notes, employee_notes, total_amount, source_booking_id, rescheduled_from_id, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING` + bookingColumns
 
 	row := tx.QueryRowContext(ctx, query,
@@ -230,10 +230,64 @@ func insertBookingInTx(ctx context.Context, tx *sql.Tx, booking *Booking) (*Book
 		booking.EmployeeNotes,
 		booking.TotalAmount,
 		booking.SourceBookingID,
+		booking.RescheduledFromID,
 		booking.CreatedAt,
 		booking.UpdatedAt,
 	)
 	return scanBooking(row)
+}
+
+// Reschedule updates booking schedule with overlap prevention.
+func (r *Repository) Reschedule(
+	ctx context.Context,
+	bookingID uuid.UUID,
+	bookingDate time.Time,
+	start, end availability.TimeOfDay,
+	changedByUserID uuid.UUID,
+	reason *string,
+	at time.Time,
+) (*Booking, error) {
+	var updated *Booking
+	err := database.RunInTx(ctx, r.db, func(tx *sql.Tx) error {
+		existing, err := getByIDInTx(ctx, tx, bookingID, true)
+		if err != nil {
+			return err
+		}
+
+		overlap, err := hasOverlappingBookingInTx(ctx, tx, existing.EmployeeID, bookingDate, start, end, bookingID)
+		if err != nil {
+			return err
+		}
+		if overlap {
+			return ErrDoubleBooking
+		}
+
+		query := `
+			UPDATE bookings
+			SET booking_date = $2,
+			    start_time = $3,
+			    end_time = $4,
+			    updated_at = $5
+			WHERE id = $1
+			RETURNING` + bookingColumns
+
+		row := tx.QueryRowContext(ctx, query, bookingID, bookingDate, start, end, at)
+		booking, err := scanBooking(row)
+		if err != nil {
+			return fmt.Errorf("reschedule booking: %w", err)
+		}
+
+		if err := insertStatusHistoryInTx(ctx, tx, bookingID, &existing.Status, existing.Status, changedByUserID, reason); err != nil {
+			return err
+		}
+
+		updated = booking
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 func insertStatusHistoryInTx(
@@ -338,6 +392,7 @@ func scanBooking(row rowScanner) (*Booking, error) {
 		&booking.EmployeeNotes,
 		&booking.TotalAmount,
 		&booking.SourceBookingID,
+		&booking.RescheduledFromID,
 		&booking.CreatedAt,
 		&booking.UpdatedAt,
 	)

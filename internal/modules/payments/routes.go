@@ -8,7 +8,7 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/security"
 )
 
-func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
+func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager, auditStore middleware.AuditStore) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Authenticate(tokens))
 		r.Use(middleware.RequireRole(users.RoleEmployee))
@@ -17,6 +17,8 @@ func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Authenticate(tokens))
 		r.Use(middleware.RequireRole(users.RoleAdmin))
+		r.Use(middleware.AdminAudit(auditStore))
 		r.Get("/admin/payments", h.listAdmin)
+		r.Post("/admin/payments/{id}/refund", h.refund)
 	})
 }

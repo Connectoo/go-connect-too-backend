@@ -92,6 +92,17 @@ func (r *Repository) ListAdmin(ctx context.Context, status string, offset, limit
 	return items, total, nil
 }
 
+// ListAll returns all reports for export.
+func (r *Repository) ListAll(ctx context.Context) ([]Report, error) {
+	query := `SELECT` + reportColumns + ` FROM reports ORDER BY created_at DESC`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list all reports: %w", err)
+	}
+	defer rows.Close()
+	return scanReports(rows)
+}
+
 // Resolve marks a report as resolved.
 func (r *Repository) Resolve(ctx context.Context, id uuid.UUID, at time.Time) (*Report, error) {
 	query := `

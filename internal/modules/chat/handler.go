@@ -65,6 +65,33 @@ func (h *Handler) listMessages(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, "Messages loaded", items)
 }
 
+func (h *Handler) markMessageRead(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+
+	conversationID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid conversation id", sharederrors.CodeValidationError)
+		return
+	}
+	messageID, err := uuid.Parse(chi.URLParam(r, "messageId"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid message id", sharederrors.CodeValidationError)
+		return
+	}
+
+	item, err := h.svc.MarkMessageRead(r.Context(), userID, conversationID, messageID)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Message marked as read", item)
+}
+
 func (h *Handler) sendMessage(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

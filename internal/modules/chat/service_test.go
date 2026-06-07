@@ -110,6 +110,19 @@ func (m *mockChatStore) CreateMessage(_ context.Context, message *Message, _ tim
 	return &copy, nil
 }
 
+func (m *mockChatStore) MarkMessageRead(_ context.Context, _, messageID, _ uuid.UUID, at time.Time) (*Message, error) {
+	for i, message := range m.messages {
+		if message.ID == messageID {
+			readAt := at
+			updated := message
+			updated.ReadAt = &readAt
+			m.messages[i] = updated
+			return &updated, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
 func (m *mockChatStore) ListMessages(_ context.Context, conversationID uuid.UUID, offset, limit int) ([]Message, int, error) {
 	filtered := make([]Message, 0)
 	for _, message := range m.messages {

@@ -10,8 +10,10 @@ endif
 run:
 	go run ./cmd/api
 
+TEST_PKGS := $(shell go list ./... | grep -v node_modules)
+
 test:
-	go test ./...
+	go test $(TEST_PKGS)
 
 install-tools:
 	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest

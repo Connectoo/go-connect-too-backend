@@ -131,6 +131,87 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, "Profile loaded", res)
 }
 
+func (h *Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req ForgotPasswordRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+
+	if err := h.svc.ForgotPassword(r.Context(), req); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "If the account exists, reset instructions were sent", nil)
+}
+
+func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
+	var req ResetPasswordRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+
+	if err := h.svc.ResetPassword(r.Context(), req); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Password updated", nil)
+}
+
+func (h *Handler) verifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req VerifyEmailRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+
+	if err := h.svc.VerifyEmail(r.Context(), req); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Email verified", nil)
+}
+
+func (h *Handler) resendVerification(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+
+	if err := h.svc.ResendVerification(r.Context(), userID); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Verification email sent", nil)
+}
+
+func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.Error(w, http.StatusUnauthorized, "Authentication required", sharederrors.CodeUnauthorized)
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+
+	if err := h.svc.ChangePassword(r.Context(), userID, req); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "Password changed", nil)
+}
+
 func decodeJSON(r *http.Request, dst interface{}) error {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()

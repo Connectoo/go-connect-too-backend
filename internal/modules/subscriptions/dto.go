@@ -34,14 +34,36 @@ type PlanResponse struct {
 }
 
 type SubscriptionResponse struct {
-	ID         uuid.UUID     `json:"id"`
-	EmployeeID uuid.UUID     `json:"employee_id"`
-	PlanID     uuid.UUID     `json:"plan_id"`
-	PlanName   string        `json:"plan_name"`
-	Status     string        `json:"status"`
-	StartsAt   *string       `json:"starts_at,omitempty"`
-	ExpiresAt  *string       `json:"expires_at,omitempty"`
-	Plan       *PlanResponse `json:"plan,omitempty"`
-	CreatedAt  string        `json:"created_at"`
-	UpdatedAt  string        `json:"updated_at"`
+	ID                 uuid.UUID     `json:"id"`
+	EmployeeID         uuid.UUID     `json:"employee_id"`
+	PlanID             uuid.UUID     `json:"plan_id"`
+	PlanName           string        `json:"plan_name"`
+	Status             string        `json:"status"`
+	StartsAt           *string       `json:"starts_at,omitempty"`
+	ExpiresAt          *string       `json:"expires_at,omitempty"`
+	AutoRenew          bool          `json:"auto_renew"`
+	CancelledAt        *string       `json:"cancelled_at,omitempty"`
+	CancellationReason *string       `json:"cancellation_reason,omitempty"`
+	Plan               *PlanResponse `json:"plan,omitempty"`
+	CreatedAt          string        `json:"created_at"`
+	UpdatedAt          string        `json:"updated_at"`
+}
+
+type CancelSubscriptionRequest struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+type ChangePlanRequest struct {
+	PlanID uuid.UUID `json:"plan_id"`
+}
+
+type AutoRenewRequest struct {
+	AutoRenew bool `json:"auto_renew"`
+}
+
+type VerifyPaymentRequest struct {
+	PaymentID         uuid.UUID `json:"payment_id"`
+	ProviderOrderID   string    `json:"provider_order_id"`
+	ProviderPaymentID string    `json:"provider_payment_id"`
+	Signature         string    `json:"signature"`
 }

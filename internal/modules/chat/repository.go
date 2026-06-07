@@ -21,7 +21,7 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 const conversationColumns = `id, customer_id, employee_id, booking_id, created_at, updated_at`
-const messageColumns = `id, conversation_id, sender_id, message, read_at, created_at`
+const messageColumns = `id, conversation_id, sender_id, message, attachment_url, content_type, read_at, created_at`
 
 // EnsureForBooking creates a conversation for a booking when missing.
 func (r *Repository) EnsureForBooking(ctx context.Context, bookingID, customerID, employeeID uuid.UUID, at time.Time) (*Conversation, error) {
@@ -135,8 +135,8 @@ func (r *Repository) CreateMessage(ctx context.Context, message *Message, at tim
 	defer tx.Rollback()
 
 	insertQuery := `
-		INSERT INTO chat_messages (id, conversation_id, sender_id, message, created_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO chat_messages (id, conversation_id, sender_id, message, attachment_url, content_type, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING ` + messageColumns
 
 	row := tx.QueryRowContext(
@@ -146,6 +146,8 @@ func (r *Repository) CreateMessage(ctx context.Context, message *Message, at tim
 		message.ConversationID,
 		message.SenderID,
 		message.Message,
+		message.AttachmentURL,
+		message.ContentType,
 		message.CreatedAt,
 	)
 	created, err := scanMessage(row)
@@ -199,6 +201,28 @@ func (r *Repository) ListMessages(ctx context.Context, conversationID uuid.UUID,
 	return items, total, nil
 }
 
+// MarkMessageRead sets read_at for a message not sent by the reader.
+func (r *Repository) MarkMessageRead(ctx context.Context, conversationID, messageID, readerUserID uuid.UUID, at time.Time) (*Message, error) {
+	query := `
+		UPDATE chat_messages
+		SET read_at = $4
+		WHERE id = $1
+		  AND conversation_id = $2
+		  AND sender_id <> $3
+		  AND read_at IS NULL
+		RETURNING ` + messageColumns
+
+	row := r.db.QueryRowContext(ctx, query, messageID, conversationID, readerUserID, at)
+	item, err := scanMessage(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("mark message read: %w", err)
+	}
+	return item, nil
+}
+
 type conversationScanner interface {
 	Scan(dest ...any) error
 }
@@ -225,6 +249,8 @@ func scanMessage(row conversationScanner) (*Message, error) {
 		&item.ConversationID,
 		&item.SenderID,
 		&item.Message,
+		&item.AttachmentURL,
+		&item.ContentType,
 		&item.ReadAt,
 		&item.CreatedAt,
 	); err != nil {

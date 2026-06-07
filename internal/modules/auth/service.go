@@ -33,28 +33,51 @@ type RefreshStore interface {
 
 // Service handles authentication business logic.
 type Service struct {
-	cfg           *config.Config
-	users         UserStore
-	registrar     AccountRegistrar
-	refresh       RefreshStore
-	tokens        *security.TokenManager
-	refreshTTL    time.Duration
-	refreshSecret []byte
-	now           func() time.Time
+	cfg             *config.Config
+	users           UserStore
+	lifecycleUsers  UserStore
+	registrar       AccountRegistrar
+	refresh         RefreshStore
+	lifecycle       LifecycleStore
+	mailer          EmailSender
+	tokens          *security.TokenManager
+	refreshTTL      time.Duration
+	refreshSecret   []byte
+	lifecycleSecret []byte
+	now             func() time.Time
 }
 
 // NewService creates an auth service.
-func NewService(cfg *config.Config, userStore UserStore, registrar AccountRegistrar, refreshStore RefreshStore, tokens *security.TokenManager) *Service {
-	return &Service{
-		cfg:           cfg,
-		users:         userStore,
-		registrar:     registrar,
-		refresh:       refreshStore,
-		tokens:        tokens,
-		refreshTTL:    cfg.JWTRefreshTTL,
-		refreshSecret: []byte(cfg.JWTRefreshSecret),
-		now:           func() time.Time { return time.Now().UTC() },
+func NewService(cfg *config.Config, userStore UserStore, registrar AccountRegistrar, refreshStore RefreshStore, tokens *security.TokenManager, opts ...ServiceOption) *Service {
+	s := &Service{
+		cfg:             cfg,
+		users:           userStore,
+		lifecycleUsers:  userStore,
+		registrar:       registrar,
+		refresh:         refreshStore,
+		tokens:          tokens,
+		refreshTTL:      cfg.JWTRefreshTTL,
+		refreshSecret:   []byte(cfg.JWTRefreshSecret),
+		lifecycleSecret: []byte(cfg.JWTRefreshSecret),
+		now:             func() time.Time { return time.Now().UTC() },
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// ServiceOption configures optional auth service dependencies.
+type ServiceOption func(*Service)
+
+// WithLifecycleStore configures password reset and email verification persistence.
+func WithLifecycleStore(store LifecycleStore) ServiceOption {
+	return func(s *Service) { s.lifecycle = store }
+}
+
+// WithEmailSender configures transactional email delivery.
+func WithEmailSender(sender EmailSender) ServiceOption {
+	return func(s *Service) { s.mailer = sender }
 }
 
 // RegisterCustomer creates a customer account and issues tokens.
@@ -149,6 +172,9 @@ func (s *Service) login(ctx context.Context, req LoginRequest, role string) (*Au
 	if user.Status != users.StatusActive {
 		return nil, ErrUserInactive
 	}
+	if user.DeactivatedAt != nil {
+		return nil, ErrUserInactive
+	}
 
 	tokens, err := s.issueTokens(ctx, user)
 	if err != nil {
@@ -184,6 +210,9 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*AuthRespon
 	}
 
 	if user.Status != users.StatusActive {
+		return nil, ErrUserInactive
+	}
+	if user.DeactivatedAt != nil {
 		return nil, ErrUserInactive
 	}
 

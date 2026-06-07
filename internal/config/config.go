@@ -28,6 +28,21 @@ type Config struct {
 	RazorpayKeyID         string
 	RazorpayKeySecret     string
 	RazorpayWebhookSecret string
+
+	FCMProjectID       string
+	FCMCredentialsJSON string
+
+	SMTPHost string
+	SMTPPort int
+	SMTPUser string
+	SMTPPass string
+	SMTPFrom string
+
+	StorageProvider string
+	S3Bucket        string
+	S3Region        string
+	S3AccessKey     string
+	S3SecretKey     string
 }
 
 // Load reads configuration from the environment.
@@ -81,6 +96,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid JWT_REFRESH_TTL_DAYS: %w", err)
 	}
 
+	smtpPort, err := strconv.Atoi(getEnv("SMTP_PORT", "587"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid SMTP_PORT: %w", err)
+	}
+
 	return &Config{
 		AppEnv:                getEnv("APP_ENV", "development"),
 		HTTPPort:              port,
@@ -96,6 +116,18 @@ func Load() (*Config, error) {
 		RazorpayKeyID:         os.Getenv("RAZORPAY_KEY_ID"),
 		RazorpayKeySecret:     os.Getenv("RAZORPAY_KEY_SECRET"),
 		RazorpayWebhookSecret: os.Getenv("RAZORPAY_WEBHOOK_SECRET"),
+		FCMProjectID:          os.Getenv("FCM_PROJECT_ID"),
+		FCMCredentialsJSON:    os.Getenv("FCM_CREDENTIALS_JSON"),
+		SMTPHost:              os.Getenv("SMTP_HOST"),
+		SMTPPort:              smtpPort,
+		SMTPUser:              os.Getenv("SMTP_USER"),
+		SMTPPass:              os.Getenv("SMTP_PASS"),
+		SMTPFrom:              os.Getenv("SMTP_FROM"),
+		StorageProvider:       getEnv("STORAGE_PROVIDER", "s3"),
+		S3Bucket:              os.Getenv("S3_BUCKET"),
+		S3Region:              os.Getenv("S3_REGION"),
+		S3AccessKey:           os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:           os.Getenv("S3_SECRET_KEY"),
 	}, nil
 }
 
@@ -104,4 +136,14 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// FCMEnabled reports whether FCM push is configured.
+func (c *Config) FCMEnabled() bool {
+	return c.FCMProjectID != "" && c.FCMCredentialsJSON != ""
+}
+
+// StorageEnabled reports whether S3 storage is configured.
+func (c *Config) StorageEnabled() bool {
+	return c.StorageProvider == "s3" && c.S3Bucket != "" && c.S3Region != ""
 }

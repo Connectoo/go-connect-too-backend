@@ -92,6 +92,16 @@ func (m *mockAnalyticsStore) AdminPopularCategories(context.Context, DateRange, 
 	}, nil
 }
 
+func (m *mockAnalyticsStore) EmployeeAverageResponseTimeMs(context.Context, uuid.UUID, DateRange) (*int64, error) {
+	ms := int64(3600000)
+	return &ms, nil
+}
+
+func (m *mockAnalyticsStore) AdminChurnRate(context.Context, DateRange) (*float64, error) {
+	rate := 0.05
+	return &rate, nil
+}
+
 type mockEmployeeLookup struct {
 	profile *employees.Profile
 }
@@ -117,8 +127,8 @@ func TestEmployeeSummary(t *testing.T) {
 	if res.ProfileViews != 42 || res.TotalBookings != 10 || res.EstimatedRevenue != "1500.00" {
 		t.Fatalf("unexpected summary: %+v", res)
 	}
-	if res.AverageResponseTimeMs != nil {
-		t.Fatal("expected nil average response time placeholder")
+	if res.AverageResponseTimeMs == nil || *res.AverageResponseTimeMs != 3600000 {
+		t.Fatalf("unexpected average response time: %+v", res.AverageResponseTimeMs)
 	}
 }
 
@@ -139,8 +149,8 @@ func TestAdminSummary(t *testing.T) {
 	if res.TotalUsers != 100 || res.MonthlyRecurringRevenue != 49900 || res.BookingVolume != 25 {
 		t.Fatalf("unexpected admin summary: %+v", res)
 	}
-	if res.ChurnRate != nil {
-		t.Fatal("expected nil churn rate placeholder")
+	if res.ChurnRate == nil || *res.ChurnRate != 0.05 {
+		t.Fatalf("unexpected churn rate: %+v", res.ChurnRate)
 	}
 }
 

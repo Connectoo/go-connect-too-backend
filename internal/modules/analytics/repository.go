@@ -433,6 +433,53 @@ func scanStatusCounts(rows *sql.Rows) ([]StatusCount, error) {
 	return items, nil
 }
 
+// EmployeeAverageResponseTimeMs averages pending-to-accepted transition time in milliseconds.
+func (r *Repository) EmployeeAverageResponseTimeMs(ctx context.Context, employeeID uuid.UUID, dr DateRange) (*int64, error) {
+	var avg sql.NullFloat64
+	err := r.db.QueryRowContext(ctx, `
+		SELECT AVG(EXTRACT(EPOCH FROM (accepted.created_at - pending.created_at)) * 1000)
+		FROM bookings b
+		JOIN booking_status_history pending
+		  ON pending.booking_id = b.id AND pending.new_status = 'pending'
+		JOIN booking_status_history accepted
+		  ON accepted.booking_id = b.id AND accepted.new_status = 'accepted'
+		WHERE b.employee_id = $1
+		  AND b.created_at >= $2
+		  AND b.created_at < $3
+		  AND accepted.created_at >= pending.created_at`,
+		employeeID, dr.From, dr.To,
+	).Scan(&avg)
+	if err != nil {
+		return nil, fmt.Errorf("employee average response time: %w", err)
+	}
+	if !avg.Valid {
+		return nil, nil
+	}
+	value := int64(avg.Float64)
+	return &value, nil
+}
+
+// AdminChurnRate returns cancelled subscriptions divided by active at period start.
+func (r *Repository) AdminChurnRate(ctx context.Context, dr DateRange) (*float64, error) {
+	var cancelled, activeStart int
+	err := r.db.QueryRowContext(ctx, `
+		SELECT
+			(SELECT COUNT(*)::int FROM employee_subscriptions
+			 WHERE status = 'cancelled' AND cancelled_at >= $1 AND cancelled_at < $2),
+			(SELECT COUNT(*)::int FROM employee_subscriptions
+			 WHERE status = 'active' AND starts_at <= $1 AND expires_at > $1)`,
+		dr.From, dr.To,
+	).Scan(&cancelled, &activeStart)
+	if err != nil {
+		return nil, fmt.Errorf("admin churn rate: %w", err)
+	}
+	if activeStart == 0 {
+		return nil, nil
+	}
+	rate := float64(cancelled) / float64(activeStart) * 100
+	return &rate, nil
+}
+
 func scanBookingDayCounts(rows *sql.Rows) ([]BookingDayCount, error) {
 	var items []BookingDayCount
 	for rows.Next() {

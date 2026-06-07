@@ -9,4 +9,5 @@ var (
 	ErrAddressNotFound  = errors.New("address not found")
 	ErrValidation       = errors.New("validation failed")
 	ErrForbiddenProfile = errors.New("profile update not allowed")
+	ErrDeactivated      = errors.New("account deactivated")
 )

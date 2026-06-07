@@ -9,12 +9,15 @@ import (
 )
 
 // RegisterRoutes mounts authenticated report submission endpoints.
-func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
+func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager, auditStore middleware.AuditStore) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Authenticate(tokens))
 		r.Post("/reports", h.create)
 	})
 
-	r.With(middleware.Authenticate(tokens), middleware.RequireRole(users.RoleAdmin)).
-		Get("/admin/reports/export-placeholder", h.exportPlaceholder)
+	r.With(
+		middleware.Authenticate(tokens),
+		middleware.RequireRole(users.RoleAdmin),
+		middleware.AdminAudit(auditStore),
+	).Get("/admin/reports/export", h.exportCSV)
 }

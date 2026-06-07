@@ -36,6 +36,8 @@ type AnalyticsStore interface {
 	AdminBookingsByStatus(ctx context.Context, dr DateRange) ([]StatusCount, error)
 	AdminBookingsDaily(ctx context.Context, dr DateRange) ([]BookingDayCount, error)
 	AdminPopularCategories(ctx context.Context, dr DateRange, limit int) ([]CategoryBookingCount, error)
+	EmployeeAverageResponseTimeMs(ctx context.Context, employeeID uuid.UUID, dr DateRange) (*int64, error)
+	AdminChurnRate(ctx context.Context, dr DateRange) (*float64, error)
 }
 
 // Service handles analytics business logic.
@@ -85,6 +87,10 @@ func (s *Service) EmployeeSummary(ctx context.Context, userID uuid.UUID, fromPar
 	if err != nil {
 		return nil, err
 	}
+	avgResponse, err := s.store.EmployeeAverageResponseTimeMs(ctx, profile.ID, dr)
+	if err != nil {
+		return nil, err
+	}
 
 	return &EmployeeSummaryResponse{
 		Period:                dr.ToResponse(),
@@ -92,7 +98,7 @@ func (s *Service) EmployeeSummary(ctx context.Context, userID uuid.UUID, fromPar
 		TotalBookings:         total,
 		CompletedBookings:     completed,
 		CancelledBookings:     cancelled,
-		AverageResponseTimeMs: nil,
+		AverageResponseTimeMs: avgResponse,
 		EstimatedRevenue:      revenue,
 		RatingTrend:           toRatingPoints(trend),
 	}, nil
@@ -175,6 +181,10 @@ func (s *Service) AdminSummary(ctx context.Context, fromParam, toParam string) (
 	if err != nil {
 		return nil, err
 	}
+	churnRate, err := s.store.AdminChurnRate(ctx, dr)
+	if err != nil {
+		return nil, err
+	}
 
 	return &AdminSummaryResponse{
 		Period:                  dr.ToResponse(),
@@ -185,7 +195,7 @@ func (s *Service) AdminSummary(ctx context.Context, fromParam, toParam string) (
 		MonthlyRecurringRevenue: mrr,
 		BookingVolume:           bookingVolume,
 		FailedPayments:          failedPayments,
-		ChurnRate:               nil,
+		ChurnRate:               churnRate,
 	}, nil
 }
 

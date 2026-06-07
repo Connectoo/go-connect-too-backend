@@ -66,12 +66,12 @@ func (r *Repository) CreateInTx(ctx context.Context, exec execContext, user *Use
 // GetByEmailAndRole returns a user by email and role.
 func (r *Repository) GetByEmailAndRole(ctx context.Context, email, role string) (*User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, role, status, created_at, updated_at
+		SELECT ` + userColumns + `
 		FROM users
 		WHERE email = $1 AND role = $2`
 
 	row := r.db.QueryRowContext(ctx, query, email, role)
-	return scanUser(row)
+	return scanUserRow(row)
 }
 
 // Update replaces editable user fields.
@@ -82,10 +82,10 @@ func (r *Repository) Update(ctx context.Context, user *User, at time.Time) (*Use
 		    phone = $3,
 		    updated_at = $4
 		WHERE id = $1
-		RETURNING id, name, email, phone, password_hash, role, status, created_at, updated_at`
+		RETURNING ` + userColumns
 
 	row := r.db.QueryRowContext(ctx, query, user.ID, user.Name, user.Phone, at)
-	updated, err := scanUser(row)
+	updated, err := scanUserRow(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -98,34 +98,16 @@ func (r *Repository) Update(ctx context.Context, user *User, at time.Time) (*Use
 // GetByID returns a user by id.
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, role, status, created_at, updated_at
+		SELECT ` + userColumns + `
 		FROM users
 		WHERE id = $1`
 
 	row := r.db.QueryRowContext(ctx, query, id)
-	return scanUser(row)
+	return scanUserRow(row)
 }
 
 func scanUser(row *sql.Row) (*User, error) {
-	var user User
-	err := row.Scan(
-		&user.ID,
-		&user.Name,
-		&user.Email,
-		&user.Phone,
-		&user.PasswordHash,
-		&user.Role,
-		&user.Status,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("scan user: %w", err)
-	}
-	return &user, nil
+	return scanUserRow(row)
 }
 
 // NowUTC is used for deterministic timestamps in tests.

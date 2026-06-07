@@ -47,6 +47,52 @@ func (r *Repository) CreateSubscriptionOrder(ctx context.Context, employeeID uui
 	return payment, nil
 }
 
+func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Payment, error) {
+	payment, err := scanPayment(r.db.QueryRowContext(ctx, `SELECT `+paymentColumns+` FROM payments WHERE id = $1`, id))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get payment by id: %w", err)
+	}
+	return payment, nil
+}
+
+func (r *Repository) GetByIDForEmployee(ctx context.Context, id, employeeID uuid.UUID) (*Payment, error) {
+	payment, err := scanPayment(r.db.QueryRowContext(ctx, `SELECT `+paymentColumns+` FROM payments WHERE id = $1 AND employee_id = $2`, id, employeeID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get payment for employee: %w", err)
+	}
+	return payment, nil
+}
+
+func (r *Repository) CreateRefund(ctx context.Context, refund *Refund, at time.Time) (*Refund, error) {
+	row := r.db.QueryRowContext(ctx, `
+		INSERT INTO refunds (id, payment_id, amount, reason, status, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+		RETURNING id, payment_id, amount, reason, status, provider_refund_id, created_by, created_at, updated_at`,
+		refund.ID, refund.PaymentID, refund.Amount, refund.Reason, refund.Status, refund.CreatedBy, at,
+	)
+	var created Refund
+	var reason sql.NullString
+	var providerRefundID sql.NullString
+	if err := row.Scan(&created.ID, &created.PaymentID, &created.Amount, &reason, &created.Status, &providerRefundID, &created.CreatedBy, &created.CreatedAt, &created.UpdatedAt); err != nil {
+		return nil, fmt.Errorf("insert refund: %w", err)
+	}
+	if reason.Valid {
+		value := reason.String
+		created.Reason = &value
+	}
+	if providerRefundID.Valid {
+		value := providerRefundID.String
+		created.ProviderRefundID = &value
+	}
+	return &created, nil
+}
+
 func (r *Repository) ListByEmployeeID(ctx context.Context, employeeID uuid.UUID) ([]Payment, error) {
 	return r.list(ctx, `SELECT `+paymentColumns+` FROM payments WHERE employee_id = $1 ORDER BY created_at DESC`, employeeID)
 }

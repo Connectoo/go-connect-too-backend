@@ -22,13 +22,17 @@ type MessageResponse struct {
 	ConversationID uuid.UUID  `json:"conversation_id"`
 	SenderID       uuid.UUID  `json:"sender_id"`
 	Message        string     `json:"message"`
+	AttachmentURL  *string    `json:"attachment_url,omitempty"`
+	ContentType    *string    `json:"content_type,omitempty"`
 	ReadAt         *time.Time `json:"read_at,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`
 }
 
 // SendMessageRequest creates a chat message.
 type SendMessageRequest struct {
-	Message string `json:"message"`
+	Message       string  `json:"message"`
+	AttachmentURL *string `json:"attachment_url,omitempty"`
+	ContentType   *string `json:"content_type,omitempty"`
 }
 
 func toConversationResponse(item *Conversation) ConversationResponse {
@@ -56,6 +60,8 @@ func toMessageResponse(item *Message) MessageResponse {
 		ConversationID: item.ConversationID,
 		SenderID:       item.SenderID,
 		Message:        item.Message,
+		AttachmentURL:  item.AttachmentURL,
+		ContentType:    item.ContentType,
 		ReadAt:         item.ReadAt,
 		CreatedAt:      item.CreatedAt,
 	}

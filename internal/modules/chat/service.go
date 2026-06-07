@@ -38,6 +38,7 @@ type Store interface {
 	HasBookingBetween(ctx context.Context, customerID, employeeID uuid.UUID) (bool, error)
 	CreateMessage(ctx context.Context, message *Message, at time.Time) (*Message, error)
 	ListMessages(ctx context.Context, conversationID uuid.UUID, offset, limit int) ([]Message, int, error)
+	MarkMessageRead(ctx context.Context, conversationID, messageID, readerUserID uuid.UUID, at time.Time) (*Message, error)
 }
 
 // EventPublisher emits chat-related platform events.
@@ -131,6 +132,8 @@ func (s *Service) SendMessage(ctx context.Context, userID, conversationID uuid.U
 		ConversationID: conversationID,
 		SenderID:       userID,
 		Message:        messageText,
+		AttachmentURL:  optionalTrimmed(req.AttachmentURL),
+		ContentType:    optionalTrimmed(req.ContentType),
 		CreatedAt:      at,
 	}, at)
 	if err != nil {
@@ -157,6 +160,32 @@ func (s *Service) SendMessage(ctx context.Context, userID, conversationID uuid.U
 
 	res := toMessageResponse(created)
 	return &res, nil
+}
+
+// MarkMessageRead marks a message as read by the authenticated user.
+func (s *Service) MarkMessageRead(ctx context.Context, userID, conversationID, messageID uuid.UUID) (*MessageResponse, error) {
+	if _, err := s.authorizeConversation(ctx, userID, conversationID); err != nil {
+		return nil, err
+	}
+
+	updated, err := s.store.MarkMessageRead(ctx, conversationID, messageID, userID, s.now())
+	if err != nil {
+		return nil, err
+	}
+
+	res := toMessageResponse(updated)
+	return &res, nil
+}
+
+func optionalTrimmed(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 func (s *Service) authorizeConversation(ctx context.Context, userID, conversationID uuid.UUID) (*Conversation, error) {

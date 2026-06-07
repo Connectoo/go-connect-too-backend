@@ -14,6 +14,7 @@ func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
 
 		r.Get("/me", h.getMe)
 		r.Put("/me", h.updateMe)
+		r.Patch("/me/deactivate", h.deactivateMe)
 
 		r.Route("/addresses", func(r chi.Router) {
 			r.Get("/", h.listAddresses)
