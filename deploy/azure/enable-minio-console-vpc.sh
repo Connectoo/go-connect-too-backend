@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# Expose MinIO Console at https://minio.${DOMAIN} via Nginx (basic auth + Let's Encrypt).
+# Expose MinIO Console at https://minio.${DOMAIN} via Nginx + Let's Encrypt.
 # Run as root AFTER enable-https-vpc.sh and DNS A record for minio.${DOMAIN}.
-#
-# Optional in .env before running:
-#   MINIO_CONSOLE_AUTH_USER=admin
-#   MINIO_CONSOLE_AUTH_PASSWORD=your-strong-password
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -42,12 +38,6 @@ fi
 
 CONSOLE_HOST="minio.${DOMAIN}"
 CONSOLE_URL="https://${CONSOLE_HOST}"
-AUTH_USER="${MINIO_CONSOLE_AUTH_USER:-admin}"
-
-if [[ -z "${MINIO_CONSOLE_AUTH_PASSWORD:-}" ]]; then
-  MINIO_CONSOLE_AUTH_PASSWORD="$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
-  echo "Generated MinIO console basic-auth password (save this): ${MINIO_CONSOLE_AUTH_PASSWORD}"
-fi
 
 persist_minio_env() {
   grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env \
@@ -56,23 +46,13 @@ persist_minio_env() {
   {
     cat .env.tmp
     echo "MINIO_BROWSER_REDIRECT_URL=${CONSOLE_URL}"
-    echo "MINIO_CONSOLE_AUTH_USER=${AUTH_USER}"
-    echo "MINIO_CONSOLE_AUTH_PASSWORD=${MINIO_CONSOLE_AUTH_PASSWORD}"
   } > .env
   rm -f .env.tmp
 }
 
 curl_console() {
-  curl -fsS --max-time 10 -u "${AUTH_USER}:${MINIO_CONSOLE_AUTH_PASSWORD}" "$@" -o /dev/null
+  curl -fsS --max-time 10 "$@" -o /dev/null
 }
-
-echo "==> Installing htpasswd helper..."
-DEBIAN_FRONTEND=noninteractive apt-get install -y apache2-utils
-
-echo "==> Creating Nginx basic auth (${AUTH_USER})..."
-htpasswd -bc /etc/nginx/.htpasswd-minio "${AUTH_USER}" "${MINIO_CONSOLE_AUTH_PASSWORD}"
-chmod 640 /etc/nginx/.htpasswd-minio
-chown root:www-data /etc/nginx/.htpasswd-minio
 
 echo "==> Configuring MinIO console redirect URL (required before reverse proxy works)..."
 persist_minio_env
@@ -108,7 +88,7 @@ echo "==> Checking Nginx proxy locally..."
 if ! curl_console -H "Host: ${CONSOLE_HOST}" "http://127.0.0.1/"; then
   echo "Nginx is not proxying ${CONSOLE_HOST} correctly."
   echo "Debug:"
-  echo "  curl -I -u ${AUTH_USER}:**** -H \"Host: ${CONSOLE_HOST}\" http://127.0.0.1/"
+  echo "  curl -I -H \"Host: ${CONSOLE_HOST}\" http://127.0.0.1/"
   echo "  nginx -T | grep -A5 minio"
   exit 1
 fi
@@ -146,8 +126,7 @@ cat <<EOF
 MinIO Console enabled.
 
   URL:      ${CONSOLE_URL}
-  Nginx:    user ${AUTH_USER} / password (see .env MINIO_CONSOLE_AUTH_PASSWORD)
-  MinIO:    user \${MINIO_ROOT_USER} / \${MINIO_ROOT_PASSWORD} from .env
+  Login:    \${MINIO_ROOT_USER} / \${MINIO_ROOT_PASSWORD} from .env
   Bucket:   go-connect-uploads
 
 Do not open ports 9000/9001 in Azure NSG — Nginx handles public access.

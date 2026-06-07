@@ -232,7 +232,7 @@ Should show `Access-Control-Allow-Origin: https://www.connectoo.online`.
 
 ## 5c. MinIO Console UI (optional)
 
-Browse uploaded files in a web UI at `https://minio.<domain>` (Nginx + basic auth). **Do not** open ports 9000/9001 in Azure NSG.
+Browse uploaded files in a web UI at `https://minio.<domain>`. **Do not** open ports 9000/9001 in Azure NSG.
 
 ### DNS
 
@@ -246,25 +246,10 @@ Browse uploaded files in a web UI at `https://minio.<domain>` (Nginx + basic aut
 cd /opt/go-connect
 git pull
 chmod +x deploy/azure/enable-minio-console-vpc.sh
-
-# Set basic-auth password in .env before running:
-# MINIO_CONSOLE_AUTH_USER=admin
-# MINIO_CONSOLE_AUTH_PASSWORD=your-password
-
 sudo bash deploy/azure/enable-minio-console-vpc.sh
 ```
 
-To change the Nginx basic-auth password later:
-
-```bash
-nano .env   # update MINIO_CONSOLE_AUTH_PASSWORD
-sudo bash deploy/azure/update-minio-console-auth.sh
-```
-
-Open **https://minio.connectoo.online** — two logins:
-
-1. **Nginx basic auth** — `MINIO_CONSOLE_AUTH_USER` / `MINIO_CONSOLE_AUTH_PASSWORD` (saved in `.env`)
-2. **MinIO** — `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` from `.env`
+Open **https://minio.connectoo.online** — log in with `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` from `.env`.
 
 Bucket: `go-connect-uploads`
 
@@ -328,7 +313,7 @@ Internet
 │    api.*  ──► Go API :8080                             │
 │    */api/* and api.* ──► Go API :8080 (127.0.0.1)       │
 │    */files/* ──► MinIO :9000                           │
-│    minio.* ──► MinIO Console :9001 (basic auth)        │
+│    minio.* ──► MinIO Console :9001                      │
 │                                                        │
 │  Postgres :5432 — SSH tunnel only, never internet      │
 └────────────────────────────────────────────────────────┘
@@ -345,7 +330,6 @@ Internet
 | `deploy/azure/nginx/go-connect-vpc.conf` | Nginx — frontends + `/api/` proxy |
 | `deploy/azure/enable-https-vpc.sh` | Let's Encrypt HTTPS |
 | `deploy/azure/enable-minio-console-vpc.sh` | MinIO web UI at minio.* |
-| `deploy/azure/update-minio-console-auth.sh` | Change MinIO console Nginx password |
 | `deploy/azure/nginx/minio-console-vpc.conf` | Nginx — MinIO console proxy |
 | `deploy/azure/env.vpc.example` | Env template |
 | `docker-compose.azure.yml` | Postgres + MinIO + API (localhost ports) |
