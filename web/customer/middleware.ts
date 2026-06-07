@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { absoluteUrl } from "@/lib/middleware-url";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -15,18 +16,18 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("customer_access_token")?.value;
 
   if (!token && !isPublic) {
-    const loginUrl = new URL("/login", request.url);
+    const loginUrl = absoluteUrl(request, "/login");
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   if (token && pathname === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(absoluteUrl(request, "/dashboard"));
   }
 
   if (pathname === "/") {
     return NextResponse.redirect(
-      new URL(token ? "/dashboard" : "/login", request.url),
+      absoluteUrl(request, token ? "/dashboard" : "/login"),
     );
   }
 

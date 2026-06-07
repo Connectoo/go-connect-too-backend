@@ -159,8 +159,9 @@ Point A records to your VM **public IP**:
 | `app` | `app.connectoo.online` |
 | `provider` | `provider.connectoo.online` |
 | `api` | `api.connectoo.online` |
+| `minio` | `minio.connectoo.online` (optional — MinIO console UI) |
 
-Wait until all resolve: `dig +short www.goconnect.in`
+Wait until all resolve: `dig +short www.connectoo.online`
 
 ### Enable HTTPS (one command)
 
@@ -229,6 +230,39 @@ Should show `Access-Control-Allow-Origin: https://www.connectoo.online`.
 
 ---
 
+## 5c. MinIO Console UI (optional)
+
+Browse uploaded files in a web UI at `https://minio.<domain>` (Nginx + basic auth). **Do not** open ports 9000/9001 in Azure NSG.
+
+### DNS
+
+| Host | Example |
+|------|---------|
+| `minio` | `minio.connectoo.online` |
+
+### Enable (after HTTPS)
+
+```bash
+cd /opt/go-connect
+git pull
+chmod +x deploy/azure/enable-minio-console-vpc.sh
+
+# Optional — set a fixed basic-auth password before running:
+# MINIO_CONSOLE_AUTH_USER=admin
+# MINIO_CONSOLE_AUTH_PASSWORD=your-strong-password
+
+sudo bash deploy/azure/enable-minio-console-vpc.sh
+```
+
+Open **https://minio.connectoo.online** — two logins:
+
+1. **Nginx basic auth** — `MINIO_CONSOLE_AUTH_USER` / `MINIO_CONSOLE_AUTH_PASSWORD` (saved in `.env`)
+2. **MinIO** — `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` from `.env`
+
+Bucket: `go-connect-uploads`
+
+---
+
 ## 6. Access PostgreSQL (SSH tunnel — never public)
 
 **Do not** open port 5432 in Azure NSG. Use an SSH tunnel from your laptop:
@@ -287,6 +321,7 @@ Internet
 │    api.*  ──► Go API :8080                             │
 │    */api/* and api.* ──► Go API :8080 (127.0.0.1)       │
 │    */files/* ──► MinIO :9000                           │
+│    minio.* ──► MinIO Console :9001 (basic auth)        │
 │                                                        │
 │  Postgres :5432 — SSH tunnel only, never internet      │
 └────────────────────────────────────────────────────────┘
@@ -301,5 +336,8 @@ Internet
 | `deploy/azure/setup-vm-vpc.sh` | Bootstrap VM |
 | `deploy/azure/deploy-vpc.sh` | Rebuild Next.js (same-origin API URLs) |
 | `deploy/azure/nginx/go-connect-vpc.conf` | Nginx — frontends + `/api/` proxy |
+| `deploy/azure/enable-https-vpc.sh` | Let's Encrypt HTTPS |
+| `deploy/azure/enable-minio-console-vpc.sh` | MinIO web UI at minio.* |
+| `deploy/azure/nginx/minio-console-vpc.conf` | Nginx — MinIO console proxy |
 | `deploy/azure/env.vpc.example` | Env template |
 | `docker-compose.azure.yml` | Postgres + MinIO + API (localhost ports) |
