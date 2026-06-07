@@ -41,13 +41,11 @@ CONSOLE_URL="https://${CONSOLE_HOST}"
 
 persist_minio_env() {
   grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env \
-    | grep -v '^MINIO_SERVER_URL=' \
     | grep -v '^MINIO_CONSOLE_AUTH_USER=' \
     | grep -v '^MINIO_CONSOLE_AUTH_PASSWORD=' > .env.tmp || true
   {
     cat .env.tmp
     echo "MINIO_BROWSER_REDIRECT_URL=${CONSOLE_URL}"
-    echo "MINIO_SERVER_URL=${CONSOLE_URL}"
   } > .env
   rm -f .env.tmp
 }
@@ -125,6 +123,9 @@ else
     -d "${CONSOLE_HOST}" \
     --redirect
 fi
+
+echo "==> Installing MinIO HTTPS nginx (listen 443 ssl)..."
+bash deploy/azure/render-minio-console-nginx.sh ssl "${DOMAIN}"
 
 nginx -t
 systemctl reload nginx

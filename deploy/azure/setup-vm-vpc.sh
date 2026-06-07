@@ -134,6 +134,22 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl reload nginx
 
+HTTPS_READY=false
+if [[ -n "${DOMAIN:-}" && "${DOMAIN}" != *"nip.io" && -n "${LETSENCRYPT_EMAIL:-}" ]]; then
+  HTTPS_READY=true
+  chmod +x deploy/azure/enable-https-vpc.sh deploy/azure/render-minio-console-nginx.sh deploy/azure/deploy-vpc.sh
+  echo "==> DOMAIN + LETSENCRYPT_EMAIL set — enabling HTTPS, MinIO console, and rebuilding frontends..."
+  export REBUILD_FRONTENDS_AFTER_HTTPS=1
+  bash deploy/azure/enable-https-vpc.sh
+fi
+
+if [[ "${HTTPS_READY}" == "true" ]]; then
+  URL_SCHEME=https
+  # shellcheck disable=SC1091
+  source deploy/azure/resolve-domain.sh
+  resolve_domain_config
+fi
+
 cat <<EOF
 
 VPC setup complete (single VM in go-connect-vnet).
@@ -143,16 +159,23 @@ Public frontends:
   Admin:    ${URL_SCHEME}://admin.${DOMAIN}/login
   Customer: ${URL_SCHEME}://app.${DOMAIN}/login
   Employee: ${URL_SCHEME}://provider.${DOMAIN}/login
-
-API (private — not on api.*; reached via frontend /api/ proxy):
-  curl ${URL_SCHEME}://www.${DOMAIN}/api/v1/health
+  API:      ${URL_SCHEME}://api.${DOMAIN}/api/v1/health
+  MinIO:    ${URL_SCHEME}://minio.${DOMAIN}
 
 Demo logins (password Demo123!):
   admin@yopmail.com, alice@yopmail.com, karim@yopmail.com
 
-HTTPS (real domain required — not nip.io):
-  # 1. A records: www, admin, app, provider → VM public IP
-  # 2. Set DOMAIN=goconnect.in and LETSENCRYPT_EMAIL in .env
-  # 3. bash deploy/azure/enable-https-vpc.sh
+MinIO console login: \${MINIO_ROOT_USER} / \${MINIO_ROOT_PASSWORD} from .env
 
 EOF
+
+if [[ "${HTTPS_READY}" != "true" ]]; then
+  cat <<EOF
+HTTPS not configured (nip.io or missing LETSENCRYPT_EMAIL).
+  1. Point DNS A records: www, admin, app, provider, api, minio → VM public IP
+  2. Set DOMAIN=yourdomain.com and LETSENCRYPT_EMAIL in .env
+  3. Re-run: bash deploy/azure/setup-vm-vpc.sh
+     — or only HTTPS: bash deploy/azure/enable-https-vpc.sh && bash deploy/azure/deploy-vpc.sh
+
+EOF
+fi

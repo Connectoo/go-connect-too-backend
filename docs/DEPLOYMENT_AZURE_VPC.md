@@ -106,10 +106,16 @@ nano .env
 
 ## 3. One-command setup
 
+**Before running:** set secrets in `.env` and, for HTTPS in the same run, also set `DOMAIN` + `LETSENCRYPT_EMAIL` with DNS A records already pointing at the VM.
+
 ```bash
-chmod +x deploy/azure/setup-vm-vpc.sh deploy/azure/deploy-vpc.sh
+chmod +x deploy/azure/setup-vm-vpc.sh deploy/azure/render-minio-console-nginx.sh
 bash deploy/azure/setup-vm-vpc.sh
 ```
+
+When `DOMAIN` (real domain, not nip.io) and `LETSENCRYPT_EMAIL` are set, this **also** runs HTTPS + MinIO console + frontend rebuild automatically.
+
+For HTTP-only testing first, leave `DOMAIN` empty — then set domain/email and re-run `setup-vm-vpc.sh`, or run `enable-https-vpc.sh` separately.
 
 ---
 
@@ -331,12 +337,14 @@ Internet
 
 | Path | Purpose |
 |------|---------|
-| `deploy/azure/setup-vm-vpc.sh` | Bootstrap VM |
+| `deploy/azure/setup-vm-vpc.sh` | Bootstrap VM (+ HTTPS/MinIO when DOMAIN + LETSENCRYPT_EMAIL set) |
 | `deploy/azure/deploy-vpc.sh` | Rebuild Next.js (same-origin API URLs) |
 | `deploy/azure/nginx/go-connect-vpc.conf` | Nginx — frontends + `/api/` proxy |
-| `deploy/azure/enable-https-vpc.sh` | Let's Encrypt HTTPS |
-| `deploy/azure/enable-minio-console-vpc.sh` | MinIO web UI at minio.* |
-| `deploy/azure/fix-minio-ssl-vpc.sh` | Fix "Not secure" on minio.* (expand SSL cert) |
-| `deploy/azure/nginx/minio-console-vpc.conf` | Nginx — MinIO console proxy |
+| `deploy/azure/enable-https-vpc.sh` | HTTPS only (also called by setup-vm-vpc) |
+| `deploy/azure/render-minio-console-nginx.sh` | Render MinIO nginx (http or ssl mode) |
+| `deploy/azure/fix-minio-ssl-vpc.sh` | Repair MinIO HTTPS routing on existing VM |
+| `deploy/azure/enable-minio-console-vpc.sh` | MinIO only (legacy — use setup-vm-vpc) |
+| `deploy/azure/nginx/minio-console-vpc.conf` | Nginx — MinIO console HTTPS |
+| `deploy/azure/nginx/minio-console-vpc-http.conf` | Nginx — MinIO console HTTP (certbot) |
 | `deploy/azure/env.vpc.example` | Env template |
 | `docker-compose.azure.yml` | Postgres + MinIO + API (localhost ports) |

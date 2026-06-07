@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Add minio.${DOMAIN} to the Let's Encrypt cert and enable HTTPS on the MinIO nginx site.
-# Run when https://minio.<domain> shows "Not secure" / certificate name mismatch.
+# Fix minio.${DOMAIN} SSL routing (listen 443) or expand cert if missing.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -35,48 +34,38 @@ cert_covers_minio() {
     | grep -q "DNS:${CONSOLE_HOST}"
 }
 
-echo "==> Ensuring MinIO nginx site and redirect URL..."
+echo "==> Ensuring MinIO redirect URL..."
 grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env \
   | grep -v '^MINIO_SERVER_URL=' > .env.tmp || true
 {
   cat .env.tmp
   echo "MINIO_BROWSER_REDIRECT_URL=${CONSOLE_URL}"
-  echo "MINIO_SERVER_URL=${CONSOLE_URL}"
 } > .env
 rm -f .env.tmp
 
 docker compose -f docker-compose.azure.yml up -d minio
 
-export DOMAIN
-envsubst '$DOMAIN' < deploy/azure/nginx/minio-console-vpc.conf > /etc/nginx/sites-available/minio-console
-ln -sf /etc/nginx/sites-available/minio-console /etc/nginx/sites-enabled/minio-console
+if ! cert_covers_minio; then
+  echo "==> HTTP nginx for certbot..."
+  bash deploy/azure/render-minio-console-nginx.sh http "${DOMAIN}"
+  nginx -t
+  systemctl reload nginx
+
+  echo "==> Expanding Let's Encrypt certificate to include ${CONSOLE_HOST}..."
+  certbot --nginx --non-interactive --agree-tos --expand \
+    --email "${LETSENCRYPT_EMAIL}" \
+    -d "www.${DOMAIN}" \
+    -d "admin.${DOMAIN}" \
+    -d "app.${DOMAIN}" \
+    -d "provider.${DOMAIN}" \
+    -d "api.${DOMAIN}" \
+    -d "${CONSOLE_HOST}" \
+    --redirect
+fi
+
+echo "==> Installing MinIO HTTPS nginx (listen 443 ssl)..."
+bash deploy/azure/render-minio-console-nginx.sh ssl "${DOMAIN}"
 nginx -t
 systemctl reload nginx
 
-if cert_covers_minio; then
-  echo "Certificate already valid for ${CONSOLE_HOST}."
-  exit 0
-fi
-
-echo "==> Expanding Let's Encrypt certificate to include ${CONSOLE_HOST}..."
-certbot --nginx --non-interactive --agree-tos --expand \
-  --email "${LETSENCRYPT_EMAIL}" \
-  -d "www.${DOMAIN}" \
-  -d "admin.${DOMAIN}" \
-  -d "app.${DOMAIN}" \
-  -d "provider.${DOMAIN}" \
-  -d "api.${DOMAIN}" \
-  -d "${CONSOLE_HOST}" \
-  --redirect
-
-nginx -t
-systemctl reload nginx
-
-if cert_covers_minio; then
-  echo "OK: https://${CONSOLE_HOST} now has a valid certificate."
-else
-  echo "Certbot finished but ${CONSOLE_HOST} is still missing from the certificate."
-  echo "Check: certbot certificates"
-  echo "       cat /etc/nginx/sites-enabled/minio-console"
-  exit 1
-fi
+echo "OK: https://${CONSOLE_HOST} should route to MinIO console."

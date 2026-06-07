@@ -62,13 +62,11 @@ fi
 
 echo "==> Installing MinIO console Nginx site (for minio.${DOMAIN} certificate)..."
 grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env \
-  | grep -v '^MINIO_SERVER_URL=' \
   | grep -v '^MINIO_CONSOLE_AUTH_USER=' \
   | grep -v '^MINIO_CONSOLE_AUTH_PASSWORD=' > .env.tmp || true
 {
   cat .env.tmp
   echo "MINIO_BROWSER_REDIRECT_URL=${MINIO_CONSOLE_URL}"
-  echo "MINIO_SERVER_URL=${MINIO_CONSOLE_URL}"
 } > .env
 rm -f .env.tmp
 
@@ -92,8 +90,7 @@ if ! curl -fsS --max-time 5 "http://127.0.0.1:9001/" -o /dev/null; then
 fi
 
 export DOMAIN
-envsubst '$DOMAIN' < deploy/azure/nginx/minio-console-vpc.conf > /etc/nginx/sites-available/minio-console
-ln -sf /etc/nginx/sites-available/minio-console /etc/nginx/sites-enabled/minio-console
+bash deploy/azure/render-minio-console-nginx.sh http "${DOMAIN}"
 nginx -t
 systemctl reload nginx
 
@@ -112,6 +109,9 @@ certbot --nginx --non-interactive --agree-tos --expand \
   -d "api.${DOMAIN}" \
   -d "${MINIO_CONSOLE_HOST}" \
   --redirect
+
+echo "==> Installing MinIO HTTPS nginx (listen 443 ssl)..."
+bash deploy/azure/render-minio-console-nginx.sh ssl "${DOMAIN}"
 
 export USE_HTTPS=true
 S3_BASE_URL="https://www.${DOMAIN}/files"
@@ -140,6 +140,11 @@ resolve_domain_config
 echo "==> Restarting API (pick up CORS / S3_BASE_URL)..."
 docker compose -f docker-compose.azure.yml up -d
 
+if [[ "${REBUILD_FRONTENDS_AFTER_HTTPS:-}" == "1" ]]; then
+  echo "==> Rebuilding frontends with HTTPS URLs..."
+  bash deploy/azure/deploy-vpc.sh
+fi
+
 nginx -t
 systemctl reload nginx
 
@@ -157,6 +162,7 @@ HTTPS enabled (Let's Encrypt).
 
 Cert auto-renews via certbot systemd timer. Check: systemctl status certbot.timer
 
-If frontends still use http:// API URLs, run once: bash deploy/azure/deploy-vpc.sh
+If frontends still use http:// API URLs: REBUILD_FRONTENDS_AFTER_HTTPS=1 bash deploy/azure/enable-https-vpc.sh
+Or: bash deploy/azure/deploy-vpc.sh
 
 EOF
