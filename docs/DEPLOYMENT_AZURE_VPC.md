@@ -136,6 +136,8 @@ curl http://127.0.0.1:8080/api/v1/health   # direct — not reachable from inter
 
 Demo logins: `admin@yopmail.com` / `alice@yopmail.com` / `karim@yopmail.com` — password **`Demo123!`**
 
+**API docs (Swagger):** disabled by default in production. For the demo VM, set `ENABLE_API_DOCS=true` in `.env`, then `docker compose -f docker-compose.azure.yml up -d --build`. Open `https://www.connectoo.online/api/v1/docs/` (or your domain). Turn off after testing.
+
 ---
 
 ## 5. HTTPS with Let's Encrypt

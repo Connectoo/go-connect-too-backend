@@ -257,7 +257,7 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		settings.RegisterRoutes(r, settingsHandler, tokenManager, adminAuditRepo)
 		moderation.RegisterRoutes(r, moderationHandler, tokenManager)
 		reports.RegisterRoutes(r, reportHandler, tokenManager, adminAuditRepo)
-		if cfg.AppEnv != "production" {
+		if cfg.AppEnv != "production" || cfg.EnableAPIDocs {
 			registerDocsRoutes(r)
 		}
 	})

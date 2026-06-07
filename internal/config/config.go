@@ -11,8 +11,9 @@ import (
 
 // Config holds application configuration loaded from environment variables.
 type Config struct {
-	AppEnv      string
-	HTTPPort    int
+	AppEnv        string
+	EnableAPIDocs bool
+	HTTPPort      int
 	DatabaseURL string
 	LogLevel    string
 
@@ -105,6 +106,7 @@ func Load() (*Config, error) {
 
 	return &Config{
 		AppEnv:                getEnv("APP_ENV", "development"),
+		EnableAPIDocs:         os.Getenv("ENABLE_API_DOCS") == "true",
 		HTTPPort:              port,
 		DatabaseURL:           databaseURL,
 		LogLevel:              getEnv("LOG_LEVEL", "info"),
