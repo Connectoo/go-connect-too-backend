@@ -49,9 +49,25 @@ export type Booking = {
   end_time: string;
   status: string;
   total_amount: number;
+  customer_notes?: string | null;
+  employee_notes?: string | null;
+  source_booking_id?: string | null;
+  rescheduled_from_id?: string | null;
   created_at: string;
   updated_at: string;
 };
+
+export const BOOKING_STATUSES = [
+  "pending",
+  "accepted",
+  "in_progress",
+  "completed",
+  "rejected",
+  "cancelled",
+  "no_show",
+] as const;
+
+export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
 export type EmployeeListResult = PaginatedResult<AdminEmployee>;
 export type BookingListResult = PaginatedResult<Booking>;

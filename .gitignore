@@ -45,3 +45,4 @@ temp/
 
 # Local generated outputs
 outputs/
+.dev/

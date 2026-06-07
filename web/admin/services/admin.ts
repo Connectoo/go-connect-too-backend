@@ -1,6 +1,7 @@
 import { apiRequest } from "@/lib/api-client";
 import { getAccessToken } from "@/lib/auth";
 import type {
+  Booking,
   BookingListResult,
   Category,
   DashboardSummary,
@@ -79,5 +80,15 @@ export function fetchBookings(params: {
   return apiRequest<BookingListResult>("/admin/bookings", {
     ...authOptions(),
     params,
+  });
+}
+
+export function fetchBooking(id: string) {
+  return apiRequest<Booking>(`/admin/bookings/${id}`, authOptions());
+}
+
+export function updateBookingStatus(id: string, status: string) {
+  return apiRequest<Booking>(`/admin/bookings/${id}/status`, {
+    ...authOptions({ method: "PATCH", body: JSON.stringify({ status }) }),
   });
 }

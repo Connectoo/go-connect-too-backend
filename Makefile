@@ -1,4 +1,4 @@
-.PHONY: run test migrate-up migrate-down install-tools tidy fmt
+.PHONY: run test migrate-up migrate-down install-tools tidy fmt dev-up dev-down
 
 MIGRATE := $(shell go env GOPATH)/bin/migrate
 
@@ -32,3 +32,14 @@ tidy:
 
 fmt:
 	gofmt -w .
+
+dev-up:
+	@chmod +x scripts/dev-up.sh scripts/dev-down.sh
+	@./scripts/dev-up.sh
+
+dev-down:
+	@chmod +x scripts/dev-up.sh scripts/dev-down.sh
+	@./scripts/dev-down.sh
+
+seed:
+	go run ./cmd/seed

@@ -9,6 +9,10 @@
       ],
       "cwd": "/Users/mustafa/Desktop/projects/go-connect-too-backend",
       "type": "stdio"
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["-y", "shadcn@latest", "mcp"]
     }
   }
 }

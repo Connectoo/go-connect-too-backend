@@ -77,6 +77,9 @@ Phase 1 foundation for the service marketplace modular monolith API.
 
 | Command | Description |
 |---------|-------------|
+| `make seed` | Populate demo data + write `docs/SEED_DATA.xlsx` |
+| `make dev-up` | Start Docker, migrations, API, and all 4 web apps |
+| `make dev-down` | Stop API and all web dev servers |
 | `make run` | Start the API server |
 | `make test` | Run all Go tests |
 | `make migrate-up` | Apply migrations |

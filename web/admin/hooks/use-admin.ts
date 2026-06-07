@@ -5,11 +5,13 @@ import {
   approveEmployee,
   createCategory,
   deleteCategory,
+  fetchBooking,
   fetchBookings,
   fetchCategories,
   fetchDashboardSummary,
   fetchEmployees,
   rejectEmployee,
+  updateBookingStatus,
   updateCategory,
 } from "@/services/admin";
 
@@ -80,5 +82,24 @@ export function useAdminBookings(params: {
   return useQuery({
     queryKey: ["admin", "bookings", params],
     queryFn: () => fetchBookings(params),
+  });
+}
+
+export function useAdminBooking(id: string) {
+  return useQuery({
+    queryKey: ["admin", "bookings", id],
+    queryFn: () => fetchBooking(id),
+    enabled: Boolean(id),
+  });
+}
+
+export function useBookingStatusMutation(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (status: string) => updateBookingStatus(id, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "bookings"] });
+      qc.invalidateQueries({ queryKey: ["admin", "bookings", id] });
+    },
   });
 }

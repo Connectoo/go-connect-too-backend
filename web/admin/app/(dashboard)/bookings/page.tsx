@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { DataTable, type Column } from "@/components/admin/data-table";
 import { Pagination } from "@/components/admin/pagination";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useAdminBookings } from "@/hooks/use-admin";
 import type { Booking } from "@/types/admin";
 
@@ -41,6 +43,15 @@ export default function BookingsPage() {
         <span className="text-xs text-muted-foreground">
           S:{row.service_id.slice(0, 8)}…
         </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      cell: (row) => (
+        <Button asChild size="sm" variant="outline">
+          <Link href={`/bookings/${row.id}`}>View</Link>
+        </Button>
       ),
     },
   ];

@@ -150,6 +150,9 @@ Pass this as an env var prefix when running `make run`, `make migrate-up`, or ot
 ### Standard commands
 
 See `Makefile` and `README.md` for the full list. Key commands:
+- `make seed` — populate full demo dataset + Excel reference (`docs/SEED_DATA.xlsx`)
+- `make dev-up` — start Docker, migrations, API, and all 4 web UIs
+- `make dev-down` — stop API and web dev servers
 - `make run` — start API server
 - `make test` — run all Go tests
 - `make migrate-up` — apply DB migrations
