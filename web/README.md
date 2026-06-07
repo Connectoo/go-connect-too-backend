@@ -58,15 +58,23 @@ Populate the database with customers, employees, categories, services, bookings,
 make seed
 ```
 
-This writes **`docs/SEED_DATA.xlsx`** — a multi-sheet reference with every login, entity ID, and seeded record. All demo accounts use password **`Demo123!`** and emails ending in `@demo.go-connect.local`.
+This writes **`docs/SEED_DATA.xlsx`** — a multi-sheet reference with every login, entity ID, and seeded record. All demo accounts use password **`Demo123!`** and emails ending in `@yopmail.com`.
 
 | Role | Example login | Portal |
 |------|---------------|--------|
-| Admin | `admin@demo.go-connect.local` | http://localhost:3001/login |
-| Customer | `alice@demo.go-connect.local` | http://localhost:3002/login |
-| Employee | `karim@demo.go-connect.local` | http://localhost:3003/login |
+| Admin | `admin@yopmail.com` | http://localhost:3001/login |
+| Customer | `alice@yopmail.com` | http://localhost:3002/login |
+| Employee | `karim@yopmail.com` | http://localhost:3003/login |
 
-Re-running `make seed` clears previous `@demo.go-connect.local` data and re-inserts fresh records.
+View inboxes at [yopmail.com](https://yopmail.com) — enter the part before `@` (e.g. `alice`).
+
+Re-running `make seed` clears previous `@yopmail.com` data and re-inserts fresh records.
+
+To wipe demo data without re-seeding:
+
+```bash
+make db-clean
+```
 
 ## Auth per app
 

@@ -1,4 +1,4 @@
-.PHONY: run test migrate-up migrate-down install-tools tidy fmt dev-up dev-down
+.PHONY: run test migrate-up migrate-down install-tools tidy fmt dev-up dev-down seed db-clean db-refresh
 
 MIGRATE := $(shell go env GOPATH)/bin/migrate
 
@@ -42,4 +42,10 @@ dev-down:
 	@./scripts/dev-down.sh
 
 seed:
+	go run ./cmd/seed
+
+db-clean:
+	go run ./cmd/seed -clean-only
+
+db-refresh:
 	go run ./cmd/seed

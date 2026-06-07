@@ -151,6 +151,7 @@ Pass this as an env var prefix when running `make run`, `make migrate-up`, or ot
 
 See `Makefile` and `README.md` for the full list. Key commands:
 - `make seed` — populate full demo dataset + Excel reference (`docs/SEED_DATA.xlsx`)
+- `make db-clean` — remove demo seed data (`@yopmail.com` users, related rows, demo categories)
 - `make dev-up` — start Docker, migrations, API, and all 4 web UIs
 - `make dev-down` — stop API and web dev servers
 - `make run` — start API server

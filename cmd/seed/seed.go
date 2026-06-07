@@ -47,7 +47,8 @@ func (s *seeder) run(ctx context.Context) error {
 		{"Customer portal", "http://localhost:3002/login"},
 		{"Employee portal", "http://localhost:3003/login"},
 		{"Re-run seed", "make seed"},
-		{"Reset demo data", "make seed (auto-cleans @demo.go-connect.local users first)"},
+		{"Yopmail inbox", "https://yopmail.com — enter the part before @yopmail.com (e.g. alice)"},
+		{"Reset demo data", "make seed (auto-cleans @" + demoEmailDomain + " users first)"},
 	}
 
 	if err := s.seedCategories(ctx); err != nil {

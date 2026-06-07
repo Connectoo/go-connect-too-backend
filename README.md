@@ -78,6 +78,8 @@ Phase 1 foundation for the service marketplace modular monolith API.
 | Command | Description |
 |---------|-------------|
 | `make seed` | Populate demo data + write `docs/SEED_DATA.xlsx` |
+| `make db-clean` | Remove demo seed data (`@yopmail.com` + legacy `@demo.go-connect.local`) |
+| `make db-refresh` | Wipe demo data and re-seed (`db-clean` + `seed` in one step) |
 | `make dev-up` | Start Docker, migrations, API, and all 4 web apps |
 | `make dev-down` | Stop API and all web dev servers |
 | `make run` | Start the API server |
