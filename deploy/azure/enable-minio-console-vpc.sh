@@ -49,6 +49,24 @@ if [[ -z "${MINIO_CONSOLE_AUTH_PASSWORD:-}" ]]; then
   echo "Generated MinIO console basic-auth password (save this): ${MINIO_CONSOLE_AUTH_PASSWORD}"
 fi
 
+persist_minio_env() {
+  grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env \
+    | grep -v '^MINIO_CONSOLE_AUTH_USER=' \
+    | grep -v '^MINIO_CONSOLE_AUTH_PASSWORD=' > .env.tmp || true
+  {
+    cat .env.tmp
+    echo "MINIO_BROWSER_REDIRECT_URL=${CONSOLE_URL}"
+    echo "MINIO_CONSOLE_AUTH_USER=${AUTH_USER}"
+    echo "MINIO_CONSOLE_AUTH_PASSWORD=${MINIO_CONSOLE_AUTH_PASSWORD}"
+  } > .env
+  rm -f .env.tmp
+}
+
+curl_console() {
+  local url="$1"
+  curl -fsS --max-time 10 -u "${AUTH_USER}:${MINIO_CONSOLE_AUTH_PASSWORD}" "$url" -o /dev/null
+}
+
 echo "==> Installing htpasswd helper..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y apache2-utils
 
@@ -57,16 +75,58 @@ htpasswd -bc /etc/nginx/.htpasswd-minio "${AUTH_USER}" "${MINIO_CONSOLE_AUTH_PAS
 chmod 640 /etc/nginx/.htpasswd-minio
 chown root:www-data /etc/nginx/.htpasswd-minio
 
+echo "==> Configuring MinIO console redirect URL (required before reverse proxy works)..."
+persist_minio_env
+
+echo "==> Restarting MinIO..."
+docker compose -f docker-compose.azure.yml up -d minio
+
+echo "==> Waiting for MinIO console on 127.0.0.1:9001..."
+for _ in $(seq 1 30); do
+  if curl -fsS --max-time 2 "http://127.0.0.1:9001/" -o /dev/null; then
+    break
+  fi
+  sleep 2
+done
+if ! curl -fsS --max-time 5 "http://127.0.0.1:9001/" -o /dev/null; then
+  echo "MinIO console is not responding on 127.0.0.1:9001 — check: docker logs go-connect-minio"
+  exit 1
+fi
+
 echo "==> Installing Nginx site..."
 export DOMAIN
 envsubst '$DOMAIN' < deploy/azure/nginx/minio-console-vpc.conf > /etc/nginx/sites-available/minio-console
+if ! grep -q "server_name ${CONSOLE_HOST};" /etc/nginx/sites-available/minio-console; then
+  echo "Nginx config render failed — expected server_name ${CONSOLE_HOST};"
+  cat /etc/nginx/sites-available/minio-console
+  exit 1
+fi
 ln -sf /etc/nginx/sites-available/minio-console /etc/nginx/sites-enabled/minio-console
 nginx -t
 systemctl reload nginx
 
-echo "==> Checking HTTP for ${CONSOLE_HOST}..."
-if ! curl -fsS --max-time 10 "http://${CONSOLE_HOST}/" -o /dev/null -u "${AUTH_USER}:${MINIO_CONSOLE_AUTH_PASSWORD}"; then
-  echo "Cannot reach http://${CONSOLE_HOST}/ — add DNS A record → VM public IP, wait a few minutes, retry."
+echo "==> Checking Nginx proxy locally..."
+if ! curl_console -H "Host: ${CONSOLE_HOST}" "http://127.0.0.1/"; then
+  echo "Nginx is not proxying ${CONSOLE_HOST} correctly."
+  echo "Debug:"
+  echo "  curl -I -u ${AUTH_USER}:**** -H \"Host: ${CONSOLE_HOST}\" http://127.0.0.1/"
+  echo "  nginx -T | grep -A5 minio"
+  exit 1
+fi
+
+echo "==> Checking HTTP for ${CONSOLE_HOST} (public DNS)..."
+if ! curl_console "http://${CONSOLE_HOST}/"; then
+  vm_ip="$(curl -fsS --max-time 5 ifconfig.me 2>/dev/null || true)"
+  dns_ip="$(dig +short "${CONSOLE_HOST}" | tail -n1)"
+  echo "Cannot reach http://${CONSOLE_HOST}/ from this VM."
+  echo "  DNS ${CONSOLE_HOST} → ${dns_ip:-<no record>}"
+  echo "  VM public IP       → ${vm_ip:-unknown}"
+  if [[ -n "${vm_ip}" && -n "${dns_ip}" && "${dns_ip}" != "${vm_ip}" ]]; then
+    echo "DNS does not point to this VM — add an A record for minio → ${vm_ip}, wait a few minutes, retry."
+  else
+    echo "Nginx works locally; DNS may still be propagating. Retry in a few minutes:"
+    echo "  curl -I -u ${AUTH_USER}:**** http://${CONSOLE_HOST}/"
+  fi
   exit 1
 fi
 
@@ -80,22 +140,6 @@ certbot --nginx --non-interactive --agree-tos --expand \
   -d "api.${DOMAIN}" \
   -d "${CONSOLE_HOST}" \
   --redirect
-
-MINIO_BROWSER_REDIRECT_URL="${CONSOLE_URL}"
-
-grep -v '^MINIO_BROWSER_REDIRECT_URL=' .env \
-  | grep -v '^MINIO_CONSOLE_AUTH_USER=' \
-  | grep -v '^MINIO_CONSOLE_AUTH_PASSWORD=' > .env.tmp || true
-{
-  cat .env.tmp
-  echo "MINIO_BROWSER_REDIRECT_URL=${MINIO_BROWSER_REDIRECT_URL}"
-  echo "MINIO_CONSOLE_AUTH_USER=${AUTH_USER}"
-  echo "MINIO_CONSOLE_AUTH_PASSWORD=${MINIO_CONSOLE_AUTH_PASSWORD}"
-} > .env
-rm -f .env.tmp
-
-echo "==> Restarting MinIO with console redirect URL..."
-docker compose -f docker-compose.azure.yml up -d minio
 
 nginx -t
 systemctl reload nginx
