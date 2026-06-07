@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { customerLoginUrl, customerRegisterUrl } from "@/lib/portal-url";
+import {
+  customerLoginUrl,
+  customerRegisterUrl,
+  employeeLoginUrl,
+} from "@/lib/portal-url";
 
 const nav = [
   { href: "/categories", label: "Categories" },
@@ -29,6 +33,9 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" asChild className="hidden sm:inline-flex">
+            <a href={employeeLoginUrl()}>For providers</a>
+          </Button>
           <Button variant="ghost" asChild>
             <a href={customerLoginUrl()}>Sign in</a>
           </Button>

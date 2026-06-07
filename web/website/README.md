@@ -29,7 +29,6 @@ Public endpoints used:
 - `GET /public/providers`
 - `GET /public/providers/{id}`
 - `GET /public/services`
-- `POST /auth/register/customer`
-- `POST /auth/login/customer`
+- `GET /search/services`, `/search/employees`
 
-If the API is unavailable, pages fall back to mock data in `lib/mocks.ts`.
+Auth links redirect to the customer portal (`NEXT_PUBLIC_CUSTOMER_PORTAL_URL`, default `http://localhost:3002`). Provider sign-in links to the employee portal (`NEXT_PUBLIC_EMPLOYEE_PORTAL_URL`, default `http://localhost:3003`).
