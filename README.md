@@ -73,6 +73,17 @@ Phase 1 foundation for the service marketplace modular monolith API.
 
    Raw OpenAPI spec: [http://localhost:8080/api/v1/docs/openapi.yaml](http://localhost:8080/api/v1/docs/openapi.yaml)
 
+## Azure (full-stack testing)
+
+Deploy API, database, storage, and all four web apps on Azure:
+
+```bash
+# Single VM demo: docs/DEPLOYMENT_AZURE.md
+# Single VM in VNet (Postgres + Next.js private): docs/DEPLOYMENT_AZURE_VPC.md
+cp deploy/azure/env.example .env   # on the VM, then edit
+bash deploy/azure/setup-vm.sh
+```
+
 ## Makefile commands
 
 | Command | Description |

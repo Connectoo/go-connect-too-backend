@@ -50,6 +50,58 @@ cd web/employee && npm install && npm run dev
 
 Apps default to `NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1` if unset.
 
+## Deploy frontends on Vercel
+
+The Go API is already on Vercel (e.g. `https://go-connect-too-backend.vercel.app`). Deploy **four more Vercel projects** for the Next.js UIs.
+
+| Vercel project | Root directory | Env vars |
+|----------------|----------------|----------|
+| Website | `web/website` | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_CUSTOMER_PORTAL_URL`, `NEXT_PUBLIC_EMPLOYEE_PORTAL_URL` |
+| Admin | `web/admin` | `NEXT_PUBLIC_API_URL` |
+| Customer | `web/customer` | `NEXT_PUBLIC_API_URL` |
+| Employee | `web/employee` | `NEXT_PUBLIC_API_URL` |
+
+### Steps
+
+1. [vercel.com](https://vercel.com) → **Add New Project** → import this repo.
+2. Set **Root Directory** to `web/website` (repeat for admin, customer, employee — four projects total).
+3. Add environment variables (see below), then **Deploy**.
+4. On the **API** Vercel project, set `CORS_ALLOWED_ORIGINS` to your four frontend URLs, then redeploy the API.
+
+### Environment variables
+
+Use your real API host if it differs from the default below.
+
+**Admin, customer, employee:**
+
+```env
+NEXT_PUBLIC_API_URL=https://go-connect-too-backend.vercel.app/api/v1
+```
+
+**Website** (set portal URLs after customer/employee projects deploy):
+
+```env
+NEXT_PUBLIC_API_URL=https://go-connect-too-backend.vercel.app/api/v1
+NEXT_PUBLIC_CUSTOMER_PORTAL_URL=https://YOUR-CUSTOMER-PROJECT.vercel.app
+NEXT_PUBLIC_EMPLOYEE_PORTAL_URL=https://YOUR-EMPLOYEE-PROJECT.vercel.app
+```
+
+**API project** (`CORS_ALLOWED_ORIGINS` — comma-separated, no spaces after commas optional):
+
+```env
+CORS_ALLOWED_ORIGINS=https://YOUR-WEBSITE.vercel.app,https://YOUR-ADMIN.vercel.app,https://YOUR-CUSTOMER.vercel.app,https://YOUR-EMPLOYEE.vercel.app
+```
+
+### Verify
+
+```bash
+curl https://go-connect-too-backend.vercel.app/api/v1/health
+```
+
+Then open each frontend login page and sign in with seed credentials (`admin@yopmail.com` / `Demo123!`).
+
+**Note:** WebSocket chat/notifications (`/api/v1/ws`) do not work on Vercel serverless; REST APIs and login flows do.
+
 ## Demo seed data
 
 Populate the database with customers, employees, categories, services, bookings, reviews, and more:
