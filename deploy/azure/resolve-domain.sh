@@ -36,12 +36,11 @@ resolve_domain_config() {
 
   export CUSTOMER_URL="${CUSTOMER_URL:-${scheme}://app.${domain}}"
   export EMPLOYEE_URL="${EMPLOYEE_URL:-${scheme}://provider.${domain}}"
-  export CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-${scheme}://www.${domain},${scheme}://admin.${domain},${scheme}://app.${domain},${scheme}://provider.${domain}}"
+  export CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-${scheme}://www.${domain},${scheme}://admin.${domain},${scheme}://app.${domain},${scheme}://provider.${domain},${scheme}://api.${domain}}"
 
   if [[ "${VPC_MODE:-}" == "true" ]]; then
-    # API is not exposed on api.* — browsers call same-origin /api/ via Nginx
     export PRIVATE_HOST="${PRIVATE_HOST:-$(hostname -I | awk '{print $1}')}"
-    export API_PUBLIC_URL="${API_PUBLIC_URL:-${scheme}://www.${domain}/api/v1}"
+    export API_PUBLIC_URL="${API_PUBLIC_URL:-${scheme}://api.${domain}/api/v1}"
   else
     export API_PUBLIC_URL="${API_URL}"
   fi

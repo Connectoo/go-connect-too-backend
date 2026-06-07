@@ -2,13 +2,17 @@
 
 One **Linux VM** in a **single VNet** runs the full stack:
 
-| Component | Internet | Notes |
-|-----------|----------|-------|
-| Website, admin, customer, employee | **Public** (Nginx → nip.io) | Share with clients |
-| Go API | **Private** (`127.0.0.1:8080`) | Proxied as `/api/` on each frontend host |
-| PostgreSQL, MinIO | **Private** (localhost only) | NSG blocks 5432, 9000 |
+| Component | Public URL | Backend |
+|-----------|------------|---------|
+| Website | `https://www.<domain>` | Next.js `:3000` |
+| Admin | `https://admin.<domain>` | Next.js `:3001` |
+| Customer | `https://app.<domain>` | Next.js `:3002` |
+| Employee | `https://provider.<domain>` | Next.js `:3003` |
+| **API** | `https://api.<domain>/api/v1` | Go API `:8080` |
+| Files | `https://www.<domain>/files/` or `api.<domain>/files/` | MinIO `:9000` |
+| **PostgreSQL** | **Never public** | SSH tunnel only (see below) |
 
-Browsers call `https://admin.<domain>/api/v1/...` — Nginx forwards to the private API. No public `api.*` subdomain.
+Frontends also proxy `/api/` on their own host. Mobile apps and Swagger can use `https://api.<domain>` directly.
 
 For everything public including `api.*`, see [DEPLOYMENT_AZURE.md](./DEPLOYMENT_AZURE.md).
 
@@ -115,15 +119,15 @@ bash deploy/azure/setup-vm-vpc.sh
 
 | App | URL |
 |-----|-----|
-| Website | `http://www.<nip.io>` |
-| Admin | `http://admin.<nip.io>/login` |
-| Customer | `http://app.<nip.io>/login` |
-| Employee | `http://provider.<nip.io>/login` |
-
-**API** (via frontend proxy, not a separate public host):
+| Website | `https://www.connectoo.online` |
+| Admin | `https://admin.connectoo.online/login` |
+| Customer | `https://app.connectoo.online/login` |
+| Employee | `https://provider.connectoo.online/login` |
+| API | `https://api.connectoo.online/api/v1/health` |
+| Swagger | `https://api.connectoo.online/api/v1/docs/` |
 
 ```bash
-curl http://www.<nip.io>/api/v1/health
+curl https://api.connectoo.online/api/v1/health
 ```
 
 **Private** (only on VM):
@@ -150,10 +154,11 @@ Point A records to your VM **public IP**:
 
 | Host | Example |
 |------|---------|
-| `www` | `www.goconnect.in` |
-| `admin` | `admin.goconnect.in` |
-| `app` | `app.goconnect.in` |
-| `provider` | `provider.goconnect.in` |
+| `www` | `www.connectoo.online` |
+| `admin` | `admin.connectoo.online` |
+| `app` | `app.connectoo.online` |
+| `provider` | `provider.connectoo.online` |
+| `api` | `api.connectoo.online` |
 
 Wait until all resolve: `dig +short www.goconnect.in`
 
@@ -185,7 +190,7 @@ This runs certbot, enables HTTP→HTTPS redirect, rebuilds frontends with `https
 ### Verify
 
 ```bash
-curl https://www.goconnect.in/api/v1/health
+curl https://api.connectoo.online/api/v1/health
 ```
 
 Certs auto-renew: `systemctl status certbot.timer`
@@ -194,7 +199,40 @@ Certs auto-renew: `systemctl status certbot.timer`
 
 ---
 
-## 6. Redeploy
+## 6. Access PostgreSQL (SSH tunnel — never public)
+
+**Do not** open port 5432 in Azure NSG. Use an SSH tunnel from your laptop:
+
+```bash
+# On your Mac (new terminal, keep it open)
+chmod +x deploy/azure/postgres-tunnel.sh
+VM_HOST=4.240.109.134 SSH_KEY=~/Downloads/go-connect.pem \
+  bash deploy/azure/postgres-tunnel.sh
+```
+
+Then connect with TablePlus, DBeaver, or `psql`:
+
+| Field | Value |
+|-------|-------|
+| Host | `127.0.0.1` |
+| Port | `15432` |
+| User | `app` |
+| Password | from VM `.env` `POSTGRES_PASSWORD` |
+| Database | `go_connect` |
+
+```bash
+psql "postgres://app:YOUR_PASSWORD@127.0.0.1:15432/go_connect?sslmode=disable"
+```
+
+**On the VM directly** (SSH session):
+
+```bash
+docker exec -it go-connect-postgres psql -U app -d go_connect
+```
+
+---
+
+## 7. Redeploy
 
 ```bash
 cd /opt/go-connect
@@ -214,15 +252,13 @@ Internet
 ┌────────────────────────────────────────────────────────┐
 │  VNet 10.0.0.0/16 — single VM                          │
 │                                                        │
-│  Nginx (public)                                        │
-│    www.*   ──► Next.js :3000                           │
-│    admin.* ──► Next.js :3001                           │
-│    app.*   ──► Next.js :3002                           │
-│    provider.* ──► Next.js :3003                        │
-│    */api/* ──► Go API :8080 (127.0.0.1, private)       │
-│    */files/* ──► MinIO :9000 (127.0.0.1, private)      │
+│  Nginx (public :443)                                   │
+│    www.* / admin.* / app.* / provider.* ──► Next.js    │
+│    api.*  ──► Go API :8080                             │
+│    */api/* and api.* ──► Go API :8080 (127.0.0.1)       │
+│    */files/* ──► MinIO :9000                           │
 │                                                        │
-│  Docker (localhost only): Postgres :5432               │
+│  Postgres :5432 — SSH tunnel only, never internet      │
 └────────────────────────────────────────────────────────┘
 ```
 

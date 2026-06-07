@@ -29,9 +29,8 @@ build_app() {
   local name="$1"
   local dir="$2"
   local port="$3"
-  local host_label="$4"
   local env_file="$dir/.env.production.local"
-  local api_url="${URL_SCHEME}://${host_label}.${DOMAIN}/api/v1"
+  local api_url="${API_PUBLIC_URL:-${URL_SCHEME}://api.${DOMAIN}/api/v1}"
 
   echo "==> Building ${name} (API via ${api_url})..."
   cat >"$env_file" <<EOF
@@ -50,10 +49,10 @@ EOF
   pm2 start npm --name "$name" --cwd "$dir" -- start -- -p "$port" -H "$BIND_HOST"
 }
 
-build_app website web/website 3000 www
-build_app admin web/admin 3001 admin
-build_app customer web/customer 3002 app
-build_app employee web/employee 3003 provider
+build_app website web/website 3000
+build_app admin web/admin 3001
+build_app customer web/customer 3002
+build_app employee web/employee 3003
 
 pm2 save
 echo "Frontends public via Nginx; API private on 127.0.0.1:8080 (proxied as /api/)."

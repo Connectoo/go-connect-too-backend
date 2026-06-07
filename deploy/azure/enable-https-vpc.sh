@@ -46,7 +46,7 @@ source deploy/azure/resolve-domain.sh
 resolve_domain_config
 
 echo "==> Checking HTTP is reachable before certbot..."
-for host in www admin app provider; do
+for host in www admin app provider api; do
   if ! curl -fsS --max-time 10 "http://${host}.${DOMAIN}/" -o /dev/null; then
     echo "Cannot reach http://${host}.${DOMAIN}/ — fix DNS (A → VM public IP) and Nginx first."
     exit 1
@@ -60,6 +60,7 @@ certbot --nginx --non-interactive --agree-tos \
   -d "admin.${DOMAIN}" \
   -d "app.${DOMAIN}" \
   -d "provider.${DOMAIN}" \
+  -d "api.${DOMAIN}" \
   --redirect
 
 export USE_HTTPS=true
@@ -103,7 +104,8 @@ HTTPS enabled (Let's Encrypt).
   Admin:    https://admin.${DOMAIN}/login
   Customer: https://app.${DOMAIN}/login
   Employee: https://provider.${DOMAIN}/login
-  API:      https://www.${DOMAIN}/api/v1/health
+  API:      https://api.${DOMAIN}/api/v1/health
+  Docs:     https://api.${DOMAIN}/api/v1/docs/
 
 Cert auto-renews via certbot systemd timer. Check: systemctl status certbot.timer
 
