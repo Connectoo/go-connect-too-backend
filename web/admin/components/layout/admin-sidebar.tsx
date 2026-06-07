@@ -3,13 +3,20 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BarChart3,
   Calendar,
+  CreditCard,
   FolderTree,
+  Flag,
   LayoutDashboard,
   LogOut,
+  MessageSquare,
+  Settings,
   ShieldCheck,
+  Star,
   UserCheck,
   Users,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { clearAdminAuth } from "@/lib/auth";
@@ -17,11 +24,20 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/employees", label: "Employee approvals", icon: UserCheck },
-  { href: "/kyc", label: "KYC review", icon: ShieldCheck },
+  { href: "/employees", label: "Employees", icon: UserCheck },
+  { href: "/kyc", label: "KYC", icon: ShieldCheck },
+  { href: "/bookings", label: "Bookings", icon: Calendar },
   { href: "/users", label: "Users", icon: Users },
   { href: "/categories", label: "Categories", icon: FolderTree },
-  { href: "/bookings", label: "Bookings", icon: Calendar },
+  { href: "/services", label: "Services", icon: Wrench },
+  { href: "/payments", label: "Payments", icon: CreditCard },
+  { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { href: "/subscription-plans", label: "Plans", icon: CreditCard },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/reviews", label: "Reviews", icon: Star },
+  { href: "/reports", label: "Reports", icon: Flag },
+  { href: "/support", label: "Support", icon: MessageSquare },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AdminSidebar() {
@@ -34,7 +50,7 @@ export function AdminSidebar() {
         <p className="font-semibold">Go Connect Admin</p>
         <p className="text-xs text-muted-foreground">Service marketplace</p>
       </div>
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {links.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
@@ -46,7 +62,7 @@ export function AdminSidebar() {
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-4 w-4 shrink-0" />
             {label}
           </Link>
         ))}

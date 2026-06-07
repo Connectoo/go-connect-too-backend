@@ -158,5 +158,5 @@ Then main thread: remove website `lib/mocks.ts` fallbacks, finalize cross-app he
 | 1 — Core loop | ✅ C14–C16, E6/E9–E16, A6–A7 — all 3 apps build clean |
 | 2 — Accounts & onboarding | ✅ C7–C13, E5/E7/E8, A4/A8–A10, W6 — all 4 apps build clean |
 | 3 — Engagement | ✅ C17–C23, E17–E18/E24–E27 — customer + employee build clean |
-| 4 — Money & admin ops | ☐ |
+| 4 — Money & admin ops | ✅ E19–E23, A11–A20 — employee + admin build clean |
 | 5 — Auth extras & polish | ☐ |

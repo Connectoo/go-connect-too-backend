@@ -57,3 +57,30 @@ export async function apiRequest<T>(
 
   return body.data as T;
 }
+
+export async function apiDownload(
+  path: string,
+  options: { token?: string | null; params?: RequestOptions["params"] } = {},
+): Promise<Blob> {
+  const { token, params } = options;
+  const url = buildUrl(path, params);
+
+  const response = await fetch(url, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    let message = "Download failed";
+    try {
+      const body = (await response.json()) as ApiEnvelope<unknown>;
+      message = body.message || message;
+    } catch {
+      // non-JSON error body
+    }
+    throw new ApiError(message, response.status);
+  }
+
+  return response.blob();
+}
