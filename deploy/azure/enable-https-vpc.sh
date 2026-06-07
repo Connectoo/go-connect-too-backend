@@ -46,7 +46,7 @@ source deploy/azure/resolve-domain.sh
 resolve_domain_config
 
 echo "==> Checking HTTP is reachable before certbot..."
-for host in www admin app provider; do
+for host in www admin app provider minio; do
   if ! curl -fsS --max-time 10 "http://${host}.${DOMAIN}/" -o /dev/null; then
     echo "Cannot reach http://${host}.${DOMAIN}/ — fix DNS (A → VM public IP) and Nginx first."
     exit 1
