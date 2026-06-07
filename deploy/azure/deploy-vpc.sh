@@ -25,12 +25,25 @@ CUSTOMER_URL="${CUSTOMER_URL:-${URL_SCHEME}://app.${DOMAIN}}"
 EMPLOYEE_URL="${EMPLOYEE_URL:-${URL_SCHEME}://provider.${DOMAIN}}"
 BIND_HOST="${BIND_HOST:-127.0.0.1}"
 
+# Same-origin /api/ via Nginx on each frontend host — avoids browser CORS.
+vpc_app_api_url() {
+  local name="$1"
+  case "$name" in
+    website) echo "${URL_SCHEME}://www.${DOMAIN}/api/v1" ;;
+    admin) echo "${URL_SCHEME}://admin.${DOMAIN}/api/v1" ;;
+    customer) echo "${URL_SCHEME}://app.${DOMAIN}/api/v1" ;;
+    employee) echo "${URL_SCHEME}://provider.${DOMAIN}/api/v1" ;;
+    *) echo "${API_PUBLIC_URL:-${URL_SCHEME}://api.${DOMAIN}/api/v1}" ;;
+  esac
+}
+
 build_app() {
   local name="$1"
   local dir="$2"
   local port="$3"
   local env_file="$dir/.env.production.local"
-  local api_url="${API_PUBLIC_URL:-${URL_SCHEME}://api.${DOMAIN}/api/v1}"
+  local api_url
+  api_url="$(vpc_app_api_url "$name")"
 
   echo "==> Building ${name} (API via ${api_url})..."
   cat >"$env_file" <<EOF

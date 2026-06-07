@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// CORS returns a middleware that sets permissive CORS headers.
-// In production the allowed origin is controlled by CORS_ALLOWED_ORIGINS env var
-// (comma-separated). Falls back to "*" when not set.
+// CORS returns a middleware that sets CORS headers for cross-origin browser requests.
+// Allowed origins come from CORS_ALLOWED_ORIGINS (comma-separated). Falls back to "*"
+// when unset (development only).
 func CORS(next http.Handler) http.Handler {
 	allowedOrigins := parseOrigins(os.Getenv("CORS_ALLOWED_ORIGINS"))
 
@@ -17,14 +17,9 @@ func CORS(next http.Handler) http.Handler {
 
 		if len(allowedOrigins) == 0 {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
-		} else {
-			for _, allowed := range allowedOrigins {
-				if allowed == "*" || allowed == origin {
-					w.Header().Set("Access-Control-Allow-Origin", origin)
-					w.Header().Set("Vary", "Origin")
-					break
-				}
-			}
+		} else if originAllowed(allowedOrigins, origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
@@ -52,4 +47,24 @@ func parseOrigins(raw string) []string {
 		}
 	}
 	return out
+}
+
+func normalizeOrigin(origin string) string {
+	return strings.TrimRight(strings.TrimSpace(origin), "/")
+}
+
+func originAllowed(allowedOrigins []string, origin string) bool {
+	if origin == "" {
+		return false
+	}
+	normalized := normalizeOrigin(origin)
+	for _, allowed := range allowedOrigins {
+		if allowed == "*" {
+			return true
+		}
+		if normalizeOrigin(allowed) == normalized {
+			return true
+		}
+	}
+	return false
 }

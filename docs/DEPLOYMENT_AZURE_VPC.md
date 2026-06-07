@@ -199,6 +199,36 @@ Certs auto-renew: `systemctl status certbot.timer`
 
 ---
 
+## 5b. CORS (browser API calls)
+
+VPC frontends should call the API **same-origin** via Nginx (`https://www.<domain>/api/v1`, etc.). `deploy-vpc.sh` sets `NEXT_PUBLIC_API_URL` per app — **no CORS needed** for normal web UI.
+
+Direct `https://api.<domain>` is for mobile apps, Swagger, and curl. If a browser page on another subdomain calls `api.*` directly, set `CORS_ALLOWED_ORIGINS` in `.env` (HTTPS URLs, comma-separated):
+
+```env
+CORS_ALLOWED_ORIGINS=https://www.connectoo.online,https://admin.connectoo.online,https://app.connectoo.online,https://provider.connectoo.online,https://api.connectoo.online
+```
+
+After any change:
+
+```bash
+cd /opt/go-connect
+set -a && source .env && source deploy/azure/resolve-domain.sh && resolve_domain_config && set +a
+bash deploy/azure/deploy-vpc.sh
+docker compose -f docker-compose.azure.yml up -d --build
+```
+
+Verify from Mac:
+
+```bash
+curl -s -H "Origin: https://www.connectoo.online" -I \
+  https://api.connectoo.online/api/v1/public/categories | grep -i access-control
+```
+
+Should show `Access-Control-Allow-Origin: https://www.connectoo.online`.
+
+---
+
 ## 6. Access PostgreSQL (SSH tunnel — never public)
 
 **Do not** open port 5432 in Azure NSG. Use an SSH tunnel from your laptop:
