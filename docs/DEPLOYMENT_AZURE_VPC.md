@@ -247,11 +247,18 @@ cd /opt/go-connect
 git pull
 chmod +x deploy/azure/enable-minio-console-vpc.sh
 
-# Optional — set a fixed basic-auth password before running:
+# Set basic-auth password in .env before running:
 # MINIO_CONSOLE_AUTH_USER=admin
-# MINIO_CONSOLE_AUTH_PASSWORD=your-strong-password
+# MINIO_CONSOLE_AUTH_PASSWORD=your-password
 
 sudo bash deploy/azure/enable-minio-console-vpc.sh
+```
+
+To change the Nginx basic-auth password later:
+
+```bash
+nano .env   # update MINIO_CONSOLE_AUTH_PASSWORD
+sudo bash deploy/azure/update-minio-console-auth.sh
 ```
 
 Open **https://minio.connectoo.online** — two logins:
@@ -338,6 +345,7 @@ Internet
 | `deploy/azure/nginx/go-connect-vpc.conf` | Nginx — frontends + `/api/` proxy |
 | `deploy/azure/enable-https-vpc.sh` | Let's Encrypt HTTPS |
 | `deploy/azure/enable-minio-console-vpc.sh` | MinIO web UI at minio.* |
+| `deploy/azure/update-minio-console-auth.sh` | Change MinIO console Nginx password |
 | `deploy/azure/nginx/minio-console-vpc.conf` | Nginx — MinIO console proxy |
 | `deploy/azure/env.vpc.example` | Env template |
 | `docker-compose.azure.yml` | Postgres + MinIO + API (localhost ports) |

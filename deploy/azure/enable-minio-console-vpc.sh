@@ -63,8 +63,7 @@ persist_minio_env() {
 }
 
 curl_console() {
-  local url="$1"
-  curl -fsS --max-time 10 -u "${AUTH_USER}:${MINIO_CONSOLE_AUTH_PASSWORD}" "$url" -o /dev/null
+  curl -fsS --max-time 10 -u "${AUTH_USER}:${MINIO_CONSOLE_AUTH_PASSWORD}" "$@" -o /dev/null
 }
 
 echo "==> Installing htpasswd helper..."
@@ -114,20 +113,18 @@ if ! curl_console -H "Host: ${CONSOLE_HOST}" "http://127.0.0.1/"; then
   exit 1
 fi
 
-echo "==> Checking HTTP for ${CONSOLE_HOST} (public DNS)..."
+echo "==> Checking HTTP for ${CONSOLE_HOST} (public DNS, optional)..."
 if ! curl_console "http://${CONSOLE_HOST}/"; then
   vm_ip="$(curl -fsS --max-time 5 ifconfig.me 2>/dev/null || true)"
   dns_ip="$(dig +short "${CONSOLE_HOST}" | tail -n1)"
-  echo "Cannot reach http://${CONSOLE_HOST}/ from this VM."
+  echo "Note: cannot reach http://${CONSOLE_HOST}/ from this VM (common on Azure hairpin NAT)."
   echo "  DNS ${CONSOLE_HOST} → ${dns_ip:-<no record>}"
   echo "  VM public IP       → ${vm_ip:-unknown}"
   if [[ -n "${vm_ip}" && -n "${dns_ip}" && "${dns_ip}" != "${vm_ip}" ]]; then
-    echo "DNS does not point to this VM — add an A record for minio → ${vm_ip}, wait a few minutes, retry."
+    echo "Warning: DNS may not point to this VM — certbot may fail."
   else
-    echo "Nginx works locally; DNS may still be propagating. Retry in a few minutes:"
-    echo "  curl -I -u ${AUTH_USER}:**** http://${CONSOLE_HOST}/"
+    echo "Local Nginx check passed — continuing (verify from your laptop if needed)."
   fi
-  exit 1
 fi
 
 echo "==> Expanding Let's Encrypt certificate for ${CONSOLE_HOST}..."
