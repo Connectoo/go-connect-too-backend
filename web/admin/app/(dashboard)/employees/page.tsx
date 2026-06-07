@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { DataTable, type Column } from "@/components/admin/data-table";
@@ -34,7 +35,12 @@ export default function EmployeesPage() {
       header: "Provider",
       cell: (row) => (
         <div>
-          <p className="font-medium">{row.display_name ?? row.user_name}</p>
+          <Link
+            href={`/employees/${row.id}`}
+            className="font-medium hover:underline"
+          >
+            {row.display_name ?? row.user_name}
+          </Link>
           <p className="text-xs text-muted-foreground">{row.user_email}</p>
         </div>
       ),

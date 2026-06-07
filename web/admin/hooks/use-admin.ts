@@ -2,15 +2,25 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  activateUser,
   approveEmployee,
+  approveKYC,
   createCategory,
   deleteCategory,
   fetchBooking,
   fetchBookings,
   fetchCategories,
   fetchDashboardSummary,
+  fetchEmployee,
   fetchEmployees,
+  fetchKYCRecord,
+  fetchKYCRecords,
+  fetchUser,
+  fetchUsers,
   rejectEmployee,
+  rejectKYC,
+  suspendEmployee,
+  suspendUser,
   updateBookingStatus,
   updateCategory,
 } from "@/services/admin";
@@ -102,4 +112,98 @@ export function useBookingStatusMutation(id: string) {
       qc.invalidateQueries({ queryKey: ["admin", "bookings", id] });
     },
   });
+}
+
+export function useAdminEmployee(id: string) {
+  return useQuery({
+    queryKey: ["admin", "employees", id],
+    queryFn: () => fetchEmployee(id),
+    enabled: Boolean(id),
+  });
+}
+
+export function useEmployeeSuspendMutation(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => suspendEmployee(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "employees"] });
+      qc.invalidateQueries({ queryKey: ["admin", "employees", id] });
+    },
+  });
+}
+
+export function useAdminKYC(params: {
+  page: number;
+  limit: number;
+  status?: string;
+}) {
+  return useQuery({
+    queryKey: ["admin", "kyc", params],
+    queryFn: () => fetchKYCRecords(params),
+  });
+}
+
+export function useAdminKYCRecord(id: string) {
+  return useQuery({
+    queryKey: ["admin", "kyc", id],
+    queryFn: () => fetchKYCRecord(id),
+    enabled: Boolean(id),
+  });
+}
+
+export function useKYCActions() {
+  const qc = useQueryClient();
+  return {
+    approve: useMutation({
+      mutationFn: approveKYC,
+      onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "kyc"] }),
+    }),
+    reject: useMutation({
+      mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+        rejectKYC(id, reason),
+      onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "kyc"] }),
+    }),
+  };
+}
+
+export function useAdminUsers(params: {
+  page: number;
+  limit: number;
+  role?: string;
+  status?: string;
+  q?: string;
+}) {
+  return useQuery({
+    queryKey: ["admin", "users", params],
+    queryFn: () => fetchUsers(params),
+  });
+}
+
+export function useAdminUser(id: string) {
+  return useQuery({
+    queryKey: ["admin", "users", id],
+    queryFn: () => fetchUser(id),
+    enabled: Boolean(id),
+  });
+}
+
+export function useUserActions(id: string) {
+  const qc = useQueryClient();
+  return {
+    suspend: useMutation({
+      mutationFn: () => suspendUser(id),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["admin", "users"] });
+        qc.invalidateQueries({ queryKey: ["admin", "users", id] });
+      },
+    }),
+    activate: useMutation({
+      mutationFn: () => activateUser(id),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["admin", "users"] });
+        qc.invalidateQueries({ queryKey: ["admin", "users", id] });
+      },
+    }),
+  };
 }

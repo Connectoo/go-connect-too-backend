@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useService } from "@/hooks/use-public";
+import { customerBookUrl } from "@/lib/portal-url";
 import { formatCurrency } from "@/lib/utils";
 
 export default function ServiceDetailsPage({
@@ -50,8 +51,8 @@ export default function ServiceDetailsPage({
             <Button asChild>
               <Link href={`/providers/${service.employee_id}`}>View provider</Link>
             </Button>
-            <Button variant="outline" asChild>
-              <Link href="/login">Book (sign in required)</Link>
+            <Button asChild>
+              <a href={customerBookUrl(service.id)}>Book now</a>
             </Button>
           </div>
         </CardContent>

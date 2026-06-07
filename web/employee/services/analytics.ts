@@ -1,6 +1,10 @@
 import { apiRequest } from "@/lib/api-client";
 import { getAccessToken } from "@/lib/auth";
-import type { EmployeeSummary } from "@/types/analytics";
+import type {
+  EmployeeBookingsAnalytics,
+  EmployeeReviewsAnalytics,
+  EmployeeSummary,
+} from "@/types/analytics";
 
 function authOptions(extra?: RequestInit) {
   return {
@@ -11,4 +15,18 @@ function authOptions(extra?: RequestInit) {
 
 export function fetchSummary() {
   return apiRequest<EmployeeSummary>("/employee/analytics/summary", authOptions());
+}
+
+export function fetchBookingsAnalytics() {
+  return apiRequest<EmployeeBookingsAnalytics>(
+    "/employee/analytics/bookings",
+    authOptions(),
+  );
+}
+
+export function fetchReviewsAnalytics() {
+  return apiRequest<EmployeeReviewsAnalytics>(
+    "/employee/analytics/reviews",
+    authOptions(),
+  );
 }

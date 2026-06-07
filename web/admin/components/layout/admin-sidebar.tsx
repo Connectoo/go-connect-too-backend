@@ -7,7 +7,9 @@ import {
   FolderTree,
   LayoutDashboard,
   LogOut,
+  ShieldCheck,
   UserCheck,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { clearAdminAuth } from "@/lib/auth";
@@ -16,6 +18,8 @@ import { cn } from "@/lib/utils";
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/employees", label: "Employee approvals", icon: UserCheck },
+  { href: "/kyc", label: "KYC review", icon: ShieldCheck },
+  { href: "/users", label: "Users", icon: Users },
   { href: "/categories", label: "Categories", icon: FolderTree },
   { href: "/bookings", label: "Bookings", icon: Calendar },
 ];

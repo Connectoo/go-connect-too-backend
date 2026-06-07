@@ -213,6 +213,17 @@ export default function BookingDetailPage() {
               ) : null}
             </div>
           )}
+
+          {booking.status === "completed" && (
+            <div className="flex flex-wrap gap-3">
+              <Button asChild>
+                <Link href={`/bookings/${booking.id}/review`}>Leave a review</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={`/bookings/${booking.id}/rebook`}>Book again</Link>
+              </Button>
+            </div>
+          )}
         </div>
 
         <Card>

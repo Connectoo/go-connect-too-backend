@@ -32,6 +32,9 @@ export type AdminEmployee = {
   bio?: string | null;
   experience_years: number;
   verification_status: string;
+  location_text?: string | null;
+  languages?: string[];
+  skills?: string[];
   user_name: string;
   user_email: string;
   user_status: string;
@@ -71,3 +74,34 @@ export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
 export type EmployeeListResult = PaginatedResult<AdminEmployee>;
 export type BookingListResult = PaginatedResult<Booking>;
+
+export type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  role: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UserListResult = PaginatedResult<AdminUser>;
+
+export type AdminKYCRecord = {
+  id: string;
+  employee_id: string;
+  id_proof_url: string;
+  address_proof_url: string;
+  status: string;
+  rejection_reason?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  employee_display_name?: string | null;
+  user_name: string;
+  user_email: string;
+};
+
+export type KYCListResult = PaginatedResult<AdminKYCRecord>;

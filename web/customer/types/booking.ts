@@ -41,3 +41,36 @@ export type CreateBookingInput = {
   end_time: string;
   customer_notes?: string;
 };
+
+export type RebookPreview = {
+  source_booking_id: string;
+  source_status: string;
+  service_id: string;
+  employee_id: string;
+  service_available: boolean;
+  employee_available: boolean;
+  can_rebook: boolean;
+  current_price?: number | null;
+  suggested_booking_date?: string;
+  suggested_start_time?: string;
+  suggested_end_time?: string;
+};
+
+export type RebookInput = {
+  source_booking_id: string;
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+  customer_notes?: string;
+};
+
+export type RescheduleInput = {
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+  reason?: string;
+};
+
+export type CancelInput = {
+  reason?: string;
+};

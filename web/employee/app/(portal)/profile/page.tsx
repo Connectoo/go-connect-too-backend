@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -224,6 +225,9 @@ export default function ProfilePage() {
             <div className="md:col-span-2">
               <Button type="submit" disabled={update.isPending}>
                 {update.isPending ? "Saving..." : "Save profile"}
+              </Button>
+              <Button variant="ghost" asChild className="ml-2">
+                <Link href="/settings/security">Change password</Link>
               </Button>
             </div>
           </form>

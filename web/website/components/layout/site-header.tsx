@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { customerLoginUrl, customerRegisterUrl } from "@/lib/portal-url";
 
 const nav = [
   { href: "/categories", label: "Categories" },
   { href: "/providers", label: "Providers" },
+  { href: "/search", label: "Search" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];
@@ -28,10 +30,10 @@ export function SiteHeader() {
         </nav>
         <div className="flex items-center gap-2">
           <Button variant="ghost" asChild>
-            <Link href="/login">Log in</Link>
+            <a href={customerLoginUrl()}>Sign in</a>
           </Button>
           <Button asChild>
-            <Link href="/register">Sign up</Link>
+            <a href={customerRegisterUrl()}>Sign up</a>
           </Button>
         </div>
       </div>

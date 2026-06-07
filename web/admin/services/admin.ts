@@ -1,11 +1,16 @@
 import { apiRequest } from "@/lib/api-client";
 import { getAccessToken } from "@/lib/auth";
 import type {
+  AdminEmployee,
+  AdminKYCRecord,
+  AdminUser,
   Booking,
   BookingListResult,
   Category,
   DashboardSummary,
   EmployeeListResult,
+  KYCListResult,
+  UserListResult,
 } from "@/types/admin";
 
 function authOptions(extra?: RequestInit) {
@@ -90,5 +95,71 @@ export function fetchBooking(id: string) {
 export function updateBookingStatus(id: string, status: string) {
   return apiRequest<Booking>(`/admin/bookings/${id}/status`, {
     ...authOptions({ method: "PATCH", body: JSON.stringify({ status }) }),
+  });
+}
+
+export function fetchEmployee(id: string) {
+  return apiRequest<AdminEmployee>(`/admin/employees/${id}`, authOptions());
+}
+
+export function suspendEmployee(id: string) {
+  return apiRequest(`/admin/employees/${id}/suspend`, {
+    ...authOptions({ method: "PATCH" }),
+  });
+}
+
+export function fetchKYCRecords(params: {
+  page?: number;
+  limit?: number;
+  status?: string;
+}) {
+  return apiRequest<KYCListResult>("/admin/kyc", {
+    ...authOptions(),
+    params,
+  });
+}
+
+export function fetchKYCRecord(id: string) {
+  return apiRequest<AdminKYCRecord>(`/admin/kyc/${id}`, authOptions());
+}
+
+export function approveKYC(id: string) {
+  return apiRequest(`/admin/kyc/${id}/approve`, {
+    ...authOptions({ method: "PATCH" }),
+  });
+}
+
+export function rejectKYC(id: string, reason: string) {
+  return apiRequest(`/admin/kyc/${id}/reject`, {
+    ...authOptions({ method: "PATCH", body: JSON.stringify({ reason }) }),
+  });
+}
+
+export function fetchUsers(params: {
+  page?: number;
+  limit?: number;
+  role?: string;
+  status?: string;
+  q?: string;
+}) {
+  return apiRequest<UserListResult>("/admin/users", {
+    ...authOptions(),
+    params,
+  });
+}
+
+export function fetchUser(id: string) {
+  return apiRequest<AdminUser>(`/admin/users/${id}`, authOptions());
+}
+
+export function suspendUser(id: string) {
+  return apiRequest(`/admin/users/${id}/suspend`, {
+    ...authOptions({ method: "PATCH" }),
+  });
+}
+
+export function activateUser(id: string) {
+  return apiRequest(`/admin/users/${id}/activate`, {
+    ...authOptions({ method: "PATCH" }),
   });
 }
