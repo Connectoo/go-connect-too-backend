@@ -133,7 +133,7 @@ services:
   website:
     build:
       context: ./web/website
-      dockerfile: ../../deploy/dokploy/Dockerfile.next
+      dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?set NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_CUSTOMER_PORTAL_URL: ${NEXT_PUBLIC_CUSTOMER_PORTAL_URL:?set NEXT_PUBLIC_CUSTOMER_PORTAL_URL}
@@ -153,7 +153,7 @@ services:
   admin:
     build:
       context: ./web/admin
-      dockerfile: ../../deploy/dokploy/Dockerfile.next
+      dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
@@ -171,7 +171,7 @@ services:
   customer:
     build:
       context: ./web/customer
-      dockerfile: ../../deploy/dokploy/Dockerfile.next
+      dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
@@ -189,7 +189,7 @@ services:
   employee:
     build:
       context: ./web/employee
-      dockerfile: ../../deploy/dokploy/Dockerfile.next
+      dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     restart: unless-stopped

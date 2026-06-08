@@ -1,4 +1,3 @@
-# Shared Next.js production image. Build with context = web/<app>.
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -9,11 +8,7 @@ RUN npm ci
 COPY . .
 
 ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_CUSTOMER_PORTAL_URL
-ARG NEXT_PUBLIC_EMPLOYEE_PORTAL_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_CUSTOMER_PORTAL_URL=$NEXT_PUBLIC_CUSTOMER_PORTAL_URL
-ENV NEXT_PUBLIC_EMPLOYEE_PORTAL_URL=$NEXT_PUBLIC_EMPLOYEE_PORTAL_URL
 
 RUN npm run build
 
@@ -23,9 +18,12 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
+ENV PORT=3003
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+
+EXPOSE 3003
 
 CMD ["node", "server.js"]

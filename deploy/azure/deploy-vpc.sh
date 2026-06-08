@@ -57,7 +57,7 @@ NEXT_PUBLIC_EMPLOYEE_PORTAL_URL=${EMPLOYEE_URL}
 EOF
   fi
 
-  (cd "$dir" && npm install && npm run build)
+  (cd "$dir" && npm install && chmod +x node_modules/.bin/* 2>/dev/null || true && npm run build)
   pm2 delete "$name" 2>/dev/null || true
   pm2 start npm --name "$name" --cwd "$dir" -- start -- -p "$port" -H "$BIND_HOST"
 }
