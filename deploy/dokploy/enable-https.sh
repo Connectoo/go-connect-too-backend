@@ -56,7 +56,6 @@ SUBDOMAINS=(
   app
   provider
   minio
-  storage
 )
 
 usage() {
