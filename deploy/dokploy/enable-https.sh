@@ -6,7 +6,8 @@
 # static cert for Traefik.
 #
 # Run on the Dokploy VM as root (SSH):
-#   DOMAIN=connectoo.online LETSENCRYPT_EMAIL=you@example.com bash deploy/dokploy/enable-https.sh
+#   sudo bash deploy/dokploy/enable-https.sh   # reads DOMAIN + LETSENCRYPT_EMAIL from .env
+#   sudo DOMAIN=connectoo.online LETSENCRYPT_EMAIL=you@example.com bash deploy/dokploy/enable-https.sh
 #
 # Before running:
 #   1. Dokploy → Compose → Domains: turn OFF HTTPS / Let's Encrypt on every subdomain.
@@ -29,7 +30,19 @@ fi
 
 DOMAIN="${DOMAIN:-}"
 LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-}"
+
+# Load from repo .env if present (same vars as Azure VPC setup).
+if [[ (-z "${DOMAIN}" || -z "${LETSENCRYPT_EMAIL}") && -f .env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+  DOMAIN="${DOMAIN:-}"
+  LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-}"
+fi
+
 CERT_DELAY_SEC="${CERT_DELAY_SEC:-90}"
+SKIP_PREFLIGHT="${SKIP_PREFLIGHT:-false}"
 TRAEFIK_CONTAINER="${TRAEFIK_CONTAINER:-}"
 DOKPLOY_CERT_DIR="${DOKPLOY_CERT_DIR:-/etc/dokploy/traefik/certs/connectoo}"
 DOKPLOY_DYNAMIC_DIR="${DOKPLOY_DYNAMIC_DIR:-/etc/dokploy/traefik/dynamic}"
@@ -48,14 +61,20 @@ SUBDOMAINS=(
 
 usage() {
   cat <<'EOF'
-Usage (on Dokploy server as root):
-  DOMAIN=connectoo.online LETSENCRYPT_EMAIL=you@example.com bash deploy/dokploy/enable-https.sh
+Usage (on Dokploy server as root, from repo root):
+  sudo bash deploy/dokploy/enable-https.sh
+  # reads DOMAIN + LETSENCRYPT_EMAIL from .env, or pass after sudo:
+  sudo DOMAIN=connectoo.online LETSENCRYPT_EMAIL=you@example.com bash deploy/dokploy/enable-https.sh
+
+  # Wrong (sudo strips env vars placed before sudo):
+  # DOMAIN=... LETSENCRYPT_EMAIL=... sudo bash deploy/dokploy/enable-https.sh
 
 Optional env:
   CERT_DELAY_SEC=90          seconds between each --expand step
   TRAEFIK_CONTAINER=name     auto-detected if empty
   DOKPLOY_CERT_DIR=...       copy fullchain.pem / privkey.pem here
   DOKPLOY_DYNAMIC_DIR=...    Traefik file provider directory
+  SKIP_PREFLIGHT=true        skip HTTP checks (e.g. domains removed from Dokploy)
 
 Adds one subdomain per certbot step into the same certificate (like nginx --expand).
 EOF
@@ -64,7 +83,8 @@ EOF
 if [[ -z "${DOMAIN}" || -z "${LETSENCRYPT_EMAIL}" ]]; then
   usage
   echo ""
-  echo "Set DOMAIN and LETSENCRYPT_EMAIL."
+  echo "Set DOMAIN and LETSENCRYPT_EMAIL in .env or after sudo on the command line."
+  echo "Example: sudo DOMAIN=connectoo.online LETSENCRYPT_EMAIL=you@example.com bash deploy/dokploy/enable-https.sh"
   exit 1
 fi
 
@@ -112,11 +132,15 @@ check_http_reachable() {
   local host="$1"
   local path="${2:-/}"
   echo "==> Checking http://${host}${path}"
-  if ! curl -fsS --max-time 15 "http://${host}${path}" -o /dev/null; then
-    echo "Cannot reach http://${host}${path}"
-    echo "Fix DNS (A → this server) and Dokploy domain routing first."
+  local code
+  code="$(curl -sS --max-time 15 -o /dev/null -w "%{http_code}" "http://${host}${path}" 2>/dev/null)" || code="000"
+  if [[ "${code}" == "000" ]]; then
+    echo "Cannot connect to http://${host}${path}"
+    echo "Fix DNS (A → this server) and ensure Traefik is on port 80."
     exit 1
   fi
+  # Any HTTP response means port 80 + DNS work; 404/502 still OK for certbot pre-flight.
+  echo "    reachable (HTTP ${code})"
 }
 
 install_static_tls_config() {
@@ -162,12 +186,17 @@ EOF
   echo "==> Renew hook: ${hook}"
 }
 
-echo "==> Pre-flight HTTP checks (Traefik routing on port 80)..."
-start_traefik
-check_http_reachable "api.${DOMAIN}" "/api/v1/health"
-for sub in www admin app provider minio storage; do
-  check_http_reachable "${sub}.${DOMAIN}" "/"
-done
+if [[ "${SKIP_PREFLIGHT}" == "true" ]]; then
+  echo "==> Skipping pre-flight HTTP checks (SKIP_PREFLIGHT=true)."
+  echo "    DNS must still point each subdomain A → this server for certbot."
+else
+  echo "==> Pre-flight HTTP checks (Traefik routing on port 80)..."
+  start_traefik
+  check_http_reachable "api.${DOMAIN}" "/"
+  for sub in www admin app provider minio storage; do
+    check_http_reachable "${sub}.${DOMAIN}" "/"
+  done
+fi
 
 CERT_ACCUM=()
 step=0
