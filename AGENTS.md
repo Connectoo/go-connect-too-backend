@@ -127,3 +127,88 @@ Responsibilities:
 
 Prompt:
 You are a backend security engineer. Review code for authentication, authorization, validation, secret handling, and unsafe database operations. Never expose internal errors or secrets.
+
+## Cursor Cloud specific instructions
+
+### Services
+
+| Service | How to run |
+|---------|-----------|
+| PostgreSQL 16 | `docker compose up -d` (host port 5433) |
+| Go API server | `make run` (port 8080) |
+
+### Key gotcha: DATABASE_URL mismatch
+
+The committed `.env` uses `postgres://postgres:1234@localhost:5432/...` which does not match docker-compose (`app:app` on port `5433`). When running with docker-compose, override the DATABASE_URL:
+
+```
+DATABASE_URL="postgres://app:app@localhost:5433/go_connect?sslmode=disable"
+```
+
+Pass this as an env var prefix when running `make run`, `make migrate-up`, or other DB-dependent commands.
+
+### Standard commands
+
+See `Makefile` and `README.md` for the full list. Key commands:
+- `make seed` — populate full demo dataset + Excel reference (`docs/SEED_DATA.xlsx`)
+- `make db-clean` — remove demo seed data (`@yopmail.com` users, related rows, demo categories)
+- `make dev-up` — start Docker, migrations, API, and all 4 web UIs
+- `make dev-down` — stop API and web dev servers
+- `make run` — start API server
+- `make test` — run all Go tests
+- `make migrate-up` — apply DB migrations
+- `make fmt` — format code with gofmt
+- `make install-tools` — install golang-migrate CLI
+
+### Running the API server
+
+1. Start Docker daemon: `sudo dockerd &` (if not already running)
+2. Start PostgreSQL: `docker compose up -d`
+3. Run migrations: `DATABASE_URL="postgres://app:app@localhost:5433/go_connect?sslmode=disable" make migrate-up`
+4. Start server: `DATABASE_URL="postgres://app:app@localhost:5433/go_connect?sslmode=disable" make run`
+5. Health check: `curl http://localhost:8080/api/v1/health`
+
+### Notes
+
+- Docker must be installed and running (not included in the update script since it's a system dependency).
+- The API has no external service dependencies beyond PostgreSQL (no Redis, Firebase, or payment gateways are wired up yet).
+- Swagger UI is available at `http://localhost:8080/api/v1/docs/` when `APP_ENV` is not `production`.
+
+<!-- code-review-graph MCP tools -->
+## MCP Tools: code-review-graph
+
+**IMPORTANT: This project has a knowledge graph. ALWAYS use the
+code-review-graph MCP tools BEFORE using Grep/Glob/Read to explore
+the codebase.** The graph is faster, cheaper (fewer tokens), and gives
+you structural context (callers, dependents, test coverage) that file
+scanning cannot.
+
+### When to use graph tools FIRST
+
+- **Exploring code**: `semantic_search_nodes` or `query_graph` instead of Grep
+- **Understanding impact**: `get_impact_radius` instead of manually tracing imports
+- **Code review**: `detect_changes` + `get_review_context` instead of reading entire files
+- **Finding relationships**: `query_graph` with callers_of/callees_of/imports_of/tests_for
+- **Architecture questions**: `get_architecture_overview` + `list_communities`
+
+Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
+
+### Key Tools
+
+| Tool | Use when |
+| ------ | ---------- |
+| `detect_changes` | Reviewing code changes — gives risk-scored analysis |
+| `get_review_context` | Need source snippets for review — token-efficient |
+| `get_impact_radius` | Understanding blast radius of a change |
+| `get_affected_flows` | Finding which execution paths are impacted |
+| `query_graph` | Tracing callers, callees, imports, tests, dependencies |
+| `semantic_search_nodes` | Finding functions/classes by name or keyword |
+| `get_architecture_overview` | Understanding high-level codebase structure |
+| `refactor_tool` | Planning renames, finding dead code |
+
+### Workflow
+
+1. The graph auto-updates on file changes (via hooks).
+2. Use `detect_changes` for code review.
+3. Use `get_affected_flows` to understand impact.
+4. Use `query_graph` pattern="tests_for" to check coverage.

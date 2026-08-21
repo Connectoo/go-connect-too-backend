@@ -10,14 +10,13 @@ import (
 
 // RegisterRoutes mounts category endpoints on the router.
 func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
-	r.Route("/categories", func(r chi.Router) {
-		r.Use(middleware.Authenticate(tokens))
-		r.Get("/", h.list)
-	})
+	r.Get("/categories", h.list)
 
 	r.Route("/admin/categories", func(r chi.Router) {
 		r.Use(middleware.Authenticate(tokens))
 		r.Use(middleware.RequireRole(users.RoleAdmin))
 		r.Post("/", h.create)
+		r.Put("/{id}", h.update)
+		r.Delete("/{id}", h.delete)
 	})
 }

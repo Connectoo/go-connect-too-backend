@@ -1,0 +1,48 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Firebase / cloud credentials
+*-firebase-adminsdk-*.json
+firebase-service-account.json
+google-credentials.json
+
+# Go build artifacts
+/api
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Dependencies (if vendored locally)
+/vendor/
+
+# IDE and editor
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+*.log
+tmp/
+temp/
+
+# Code review graph (local index)
+.code-review-graph/
+
+# Local generated outputs
+outputs/
+.dev/

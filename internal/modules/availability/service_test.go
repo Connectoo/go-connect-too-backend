@@ -23,6 +23,16 @@ func (m *mockProfileStore) GetByUserID(_ context.Context, _ uuid.UUID) (*employe
 	return m.profile, nil
 }
 
+func (m *mockProfileStore) GetApprovedByID(_ context.Context, id uuid.UUID) (*employees.Profile, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.profile == nil || m.profile.ID != id || m.profile.VerificationStatus != employees.VerificationApproved {
+		return nil, employees.ErrNotFound
+	}
+	return m.profile, nil
+}
+
 type mockStore struct {
 	slots map[uuid.UUID]Availability
 }

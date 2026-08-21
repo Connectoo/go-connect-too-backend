@@ -23,6 +23,43 @@ func (m *mockProfileStore) GetByUserID(_ context.Context, _ uuid.UUID) (*employe
 	return m.profile, nil
 }
 
+type mockLimitStore struct {
+	limit int
+	err   error
+}
+
+func (m mockLimitStore) CurrentServiceLimit(_ context.Context, _ uuid.UUID, _ time.Time) (int, error) {
+	return m.limit, m.err
+}
+
+func TestService_Create_enforcesSubscriptionLimit(t *testing.T) {
+	categoryID := uuid.New()
+	userID := uuid.New()
+	employeeID := uuid.New()
+	store := newMockStore(categoryID)
+	store.services[uuid.New()] = EmployeeService{
+		ID:              uuid.New(),
+		EmployeeID:      employeeID,
+		CategoryID:      categoryID,
+		Title:           "House Cleaning",
+		Price:           1200,
+		DurationMinutes: 90,
+		IsActive:        true,
+	}
+
+	svc := NewService(&mockProfileStore{profile: completeProfile(employeeID)}, store, mockLimitStore{limit: 1})
+	_, err := svc.Create(context.Background(), userID, CreateServiceRequest{
+		CategoryID:      categoryID,
+		Title:           "Deep Cleaning",
+		Price:           1500,
+		DurationMinutes: 120,
+		IsActive:        true,
+	})
+	if !errors.Is(err, ErrServiceLimit) {
+		t.Fatalf("Create() error = %v, want ErrServiceLimit", err)
+	}
+}
+
 type mockStore struct {
 	categories map[uuid.UUID]bool
 	services   map[uuid.UUID]EmployeeService
@@ -39,6 +76,18 @@ func (m *mockStore) CategoryExists(_ context.Context, categoryID uuid.UUID) (boo
 	return m.categories[categoryID], nil
 }
 
+func (m *mockStore) ListPublicActive(_ context.Context, _ *uuid.UUID, _ int) ([]EmployeeService, error) {
+	return []EmployeeService{}, nil
+}
+
+func (m *mockStore) GetPublicActiveByID(_ context.Context, _ uuid.UUID) (*EmployeeService, error) {
+	return nil, ErrNotFound
+}
+
+func (m *mockStore) ListActiveByEmployeeProfileID(_ context.Context, _ uuid.UUID) ([]EmployeeService, error) {
+	return []EmployeeService{}, nil
+}
+
 func (m *mockStore) ListByEmployeeID(_ context.Context, employeeID uuid.UUID) ([]EmployeeService, error) {
 	out := []EmployeeService{}
 	for _, service := range m.services {
@@ -47,6 +96,26 @@ func (m *mockStore) ListByEmployeeID(_ context.Context, employeeID uuid.UUID) ([
 		}
 	}
 	return out, nil
+}
+
+func (m *mockStore) CountActiveByEmployeeID(_ context.Context, employeeID uuid.UUID) (int, error) {
+	count := 0
+	for _, service := range m.services {
+		if service.EmployeeID == employeeID && service.IsActive {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (m *mockStore) CountActiveExcludingID(_ context.Context, employeeID, serviceID uuid.UUID) (int, error) {
+	count := 0
+	for _, service := range m.services {
+		if service.EmployeeID == employeeID && service.ID != serviceID && service.IsActive {
+			count++
+		}
+	}
+	return count, nil
 }
 
 func (m *mockStore) Create(_ context.Context, service *EmployeeService) (*EmployeeService, error) {

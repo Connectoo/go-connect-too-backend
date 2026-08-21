@@ -1,0 +1,56 @@
+---
+description: Next.js web UI rules for website, customer, employee, and admin apps
+globs: web/**/*
+alwaysApply: false
+---
+
+# Web UI Context
+
+Four Next.js 15 apps under `web/`:
+
+| App | Path | Port | Auth |
+|-----|------|------|------|
+| Public website | `website/` | 3000 | Public only |
+| Admin dashboard | `admin/` | 3001 | `POST /auth/login/admin` |
+| Customer portal | `customer/` | 3002 | `POST /auth/login/customer` |
+| Employee portal | `employee/` | 3003 | `POST /auth/login/employee` |
+
+API base: `NEXT_PUBLIC_API_URL` → `http://localhost:8080/api/v1`
+
+# Source of truth
+
+- Screen list + APIs: `docs/UI_INVENTORY.md`
+- OpenAPI spec: `internal/app/spec/openapi.yaml`
+- Deferred features (no UI): `docs/DEFERRED_SCOPE.md`
+
+# Patterns (copy from `web/admin`)
+
+- `lib/api-client.ts` — typed fetch with JWT + envelope parsing
+- `lib/auth.ts` — role-specific cookie + localStorage (never share tokens across apps)
+- `middleware.ts` — protect portal routes; public auth pages only
+- `services/*.ts` — API calls only (no React)
+- `hooks/use-*.ts` — TanStack Query wrappers
+- Handlers stay thin; business logic stays in the Go API
+
+# Stack
+
+Tailwind CSS, shadcn-style UI in `components/ui/`, TanStack Query, React Hook Form, Zod, lucide-react.
+
+Use the **shadcn MCP** to install missing components (`table`, `dialog`, `calendar`, `tabs`, etc.) instead of hand-rolling. If an app has no `components.json`, run `npx shadcn@latest init` in that app first, or copy existing primitives from `web/admin/components/ui/`.
+
+# App boundaries
+
+- **website/** — marketing + discovery only; link "Book" / "Sign in" to customer app (3002)
+- **customer/** — bookings, profile, addresses, chat, notifications
+- **employee/** — services, availability, booking inbox, KYC, subscription
+- **admin/** — moderation, analytics, platform settings
+
+Do not invent API endpoints. Do not build UI for deferred backend scope (customer checkout, wallet, payouts, OTP, social login).
+
+# New page checklist
+
+1. Find screen ID in `docs/UI_INVENTORY.md`
+2. Add route under correct app
+3. Add service function + hook
+4. Reuse `DataTable`, `ConfirmDialog`, `Pagination` from admin where applicable
+5. Match existing naming, types in `types/`, and error display patterns

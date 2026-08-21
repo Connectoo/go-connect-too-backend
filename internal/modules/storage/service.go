@@ -1,53 +1,109 @@
-// Package storage is a placeholder layer for future profile photo and KYC
-// document uploads.
-//
-// It currently validates and returns URL-based file references only. The
-// Service type is intentionally small so a future implementation backed by
-// S3, Firebase Storage, or local uploads can swap in without changing call
-// sites in employee or KYC modules.
 package storage
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"net/url"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
-// ErrInvalidURL is returned when the given file URL is empty or malformed.
-var ErrInvalidURL = errors.New("invalid file url")
-
-// FileStorage describes the storage surface used by other modules.
-//
-// Real upload, signing, and deletion methods will be added when a concrete
-// storage provider is wired in.
-type FileStorage interface {
-	ValidateURL(raw string) (FileReference, error)
+// ObjectStore generates presigned upload URLs and public object references.
+type ObjectStore interface {
+	PresignPut(ctx context.Context, objectKey, contentType string, expires time.Duration) (string, error)
+	PublicURL(objectKey string) string
 }
 
-// Service is the placeholder storage implementation backed by URL validation.
-type Service struct{}
-
-// NewService creates a placeholder storage service.
-func NewService() *Service {
-	return &Service{}
+// FileStore persists uploaded file metadata.
+type FileStore interface {
+	Create(ctx context.Context, file *UploadedFile) (*UploadedFile, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*UploadedFile, error)
+	SoftDelete(ctx context.Context, userID, fileID uuid.UUID, at time.Time) error
 }
 
-// ValidateURL trims and validates a file URL, returning a FileReference on
-// success.
-func (s *Service) ValidateURL(raw string) (FileReference, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return FileReference{}, fmt.Errorf("%w: url is required", ErrInvalidURL)
+// Service handles uploaded file business logic.
+type Service struct {
+	store   FileStore
+	objects ObjectStore
+	now     func() time.Time
+}
+
+// NewService creates a storage service.
+func NewService(store FileStore, objects ObjectStore) *Service {
+	return &Service{
+		store:   store,
+		objects: objects,
+		now:     func() time.Time { return time.Now().UTC() },
+	}
+}
+
+const presignTTL = 15 * time.Minute
+
+var allowedPurposes = map[string]struct{}{
+	PurposeKYCIDProof:      {},
+	PurposeKYCAddressProof: {},
+	PurposeProfilePhoto:    {},
+}
+
+// PresignUpload creates a presigned upload URL for an authenticated user.
+func (s *Service) PresignUpload(ctx context.Context, userID uuid.UUID, req PresignRequest) (*PresignResponse, error) {
+	contentType := strings.TrimSpace(req.ContentType)
+	purpose := strings.TrimSpace(req.Purpose)
+	if contentType == "" || purpose == "" {
+		return nil, fmt.Errorf("%w: content_type and purpose are required", ErrValidation)
+	}
+	if _, ok := allowedPurposes[purpose]; !ok {
+		return nil, fmt.Errorf("%w: unsupported purpose", ErrValidation)
+	}
+	if s.objects == nil {
+		return nil, ErrUnavailable
 	}
 
-	parsed, err := url.Parse(trimmed)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return FileReference{}, fmt.Errorf("%w: url must be absolute", ErrInvalidURL)
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return FileReference{}, fmt.Errorf("%w: url must use http or https", ErrInvalidURL)
+	fileID := uuid.New()
+	objectKey := fmt.Sprintf("uploads/%s/%s/%s", userID.String(), purpose, fileID.String())
+	at := s.now()
+
+	uploadURL, err := s.objects.PresignPut(ctx, objectKey, contentType, presignTTL)
+	if err != nil {
+		return nil, fmt.Errorf("presign upload: %w", err)
 	}
 
-	return FileReference{URL: trimmed}, nil
+	if _, err := s.store.Create(ctx, &UploadedFile{
+		ID:          fileID,
+		UserID:      userID,
+		ObjectKey:   objectKey,
+		ContentType: contentType,
+		Purpose:     purpose,
+		CreatedAt:   at,
+	}); err != nil {
+		return nil, err
+	}
+
+	return &PresignResponse{
+		FileID:    fileID,
+		UploadURL: uploadURL,
+		ObjectKey: objectKey,
+		ExpiresIn: int(presignTTL.Seconds()),
+	}, nil
+}
+
+// Delete removes an uploaded file owned by the authenticated user.
+func (s *Service) Delete(ctx context.Context, userID, fileID uuid.UUID) error {
+	return s.store.SoftDelete(ctx, userID, fileID, s.now())
+}
+
+// ResolveFileURL returns the public URL for an owned uploaded file.
+func (s *Service) ResolveFileURL(ctx context.Context, userID, fileID uuid.UUID) (string, error) {
+	file, err := s.store.GetByID(ctx, fileID)
+	if err != nil {
+		return "", err
+	}
+	if file.UserID != userID {
+		return "", ErrForbidden
+	}
+	if s.objects == nil {
+		return file.ObjectKey, nil
+	}
+	return s.objects.PublicURL(file.ObjectKey), nil
 }

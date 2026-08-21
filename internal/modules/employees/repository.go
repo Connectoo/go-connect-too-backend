@@ -24,7 +24,7 @@ func NewRepository(db *sql.DB) *Repository {
 const profileColumns = `
 	id, user_id, display_name, phone, bio, experience_years, profile_photo_url,
 	location_text, latitude, longitude, service_area_radius_km, languages, skills,
-	verification_status, created_at, updated_at`
+	verification_status, average_rating, total_reviews, created_at, updated_at`
 
 // CreateForUserInTx inserts a profile row for a newly registered employee user.
 func (r *Repository) CreateForUserInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, at time.Time) error {
@@ -50,6 +50,21 @@ func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) (*Profil
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get employee profile by user id: %w", err)
+	}
+	return profile, nil
+}
+
+// GetApprovedByID loads a profile only when verification is approved.
+func (r *Repository) GetApprovedByID(ctx context.Context, id uuid.UUID) (*Profile, error) {
+	query := `SELECT` + profileColumns + ` FROM employee_profiles WHERE id = $1 AND verification_status = $2`
+
+	row := r.db.QueryRowContext(ctx, query, id, VerificationApproved)
+	profile, err := scanProfile(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get approved employee profile: %w", err)
 	}
 	return profile, nil
 }
@@ -163,6 +178,8 @@ func scanProfile(row rowScanner) (*Profile, error) {
 		&languages,
 		&skills,
 		&profile.VerificationStatus,
+		&profile.AverageRating,
+		&profile.TotalReviews,
 		&profile.CreatedAt,
 		&profile.UpdatedAt,
 	)

@@ -3,208 +3,191 @@ package kyc
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/MustafaKheda/go-connect-too-backend/internal/modules/employees"
 )
 
-type mockEmployeeLookup struct {
-	byUserID map[uuid.UUID]uuid.UUID
-	err      error
+type mockEmployees struct {
+	employeeID uuid.UUID
 }
 
-func (m *mockEmployeeLookup) GetByUserID(_ context.Context, userID uuid.UUID) (uuid.UUID, error) {
-	if m.err != nil {
-		return uuid.Nil, m.err
-	}
-	employeeID, ok := m.byUserID[userID]
-	if !ok {
-		return uuid.Nil, ErrNotFound
-	}
-	return employeeID, nil
+func (m mockEmployees) GetByUserID(context.Context, uuid.UUID) (uuid.UUID, error) {
+	return m.employeeID, nil
+}
+
+type mockEmployeeUser struct {
+	userID uuid.UUID
+}
+
+func (m mockEmployeeUser) GetUserIDByEmployeeID(context.Context, uuid.UUID) (uuid.UUID, error) {
+	return m.userID, nil
+}
+
+type mockVerification struct {
+	status string
+	called bool
+}
+
+func (m *mockVerification) UpdateVerificationStatus(_ context.Context, _ uuid.UUID, status string, _ time.Time) error {
+	m.called = true
+	m.status = status
+	return nil
 }
 
 type mockRecordStore struct {
-	byEmployeeID map[uuid.UUID]*Record
+	record      *Record
+	latest      *Record
+	approveErr  error
+	rejectErr   error
+	approveCall bool
+	rejectCall  bool
 }
 
-func newMockRecordStore() *mockRecordStore {
-	return &mockRecordStore{byEmployeeID: make(map[uuid.UUID]*Record)}
+func (m *mockRecordStore) GetByEmployeeID(context.Context, uuid.UUID) (*Record, error) {
+	return m.record, nil
 }
 
-func (m *mockRecordStore) GetByEmployeeID(_ context.Context, employeeID uuid.UUID) (*Record, error) {
-	record, ok := m.byEmployeeID[employeeID]
-	if !ok {
+func (m *mockRecordStore) GetByID(context.Context, uuid.UUID) (*Record, error) {
+	return m.record, nil
+}
+
+func (m *mockRecordStore) Submit(context.Context, uuid.UUID, string, string, time.Time) (*Record, error) {
+	return m.record, nil
+}
+
+func (m *mockRecordStore) ListForAdmin(context.Context, AdminListFilter) ([]AdminListItem, int, error) {
+	return nil, 0, nil
+}
+
+func (m *mockRecordStore) GetAdminByID(_ context.Context, id uuid.UUID) (*AdminListItem, error) {
+	source := m.record
+	if m.latest != nil {
+		source = m.latest
+	}
+	if source == nil {
 		return nil, ErrNotFound
 	}
-	copy := *record
-	return &copy, nil
+	return &AdminListItem{
+		Record:    *source,
+		UserName:  "Test User",
+		UserEmail: "test@example.com",
+	}, nil
 }
 
-func (m *mockRecordStore) Submit(_ context.Context, employeeID uuid.UUID, idProofURL, addressProofURL string, at time.Time) (*Record, error) {
-	if existing, ok := m.byEmployeeID[employeeID]; ok {
-		if existing.Status != StatusRejected {
-			return nil, ErrAlreadyExists
-		}
-		updated := *existing
-		updated.IDProofURL = idProofURL
-		updated.AddressProofURL = addressProofURL
-		updated.Status = StatusPending
-		updated.RejectionReason = nil
-		updated.UpdatedAt = at
-		m.byEmployeeID[employeeID] = &updated
-		copy := updated
-		return &copy, nil
+func (m *mockRecordStore) Approve(_ context.Context, id, reviewerID uuid.UUID, at time.Time) (*Record, error) {
+	m.approveCall = true
+	if m.approveErr != nil {
+		return nil, m.approveErr
 	}
-
-	record := &Record{
-		ID:              uuid.New(),
-		EmployeeID:      employeeID,
-		IDProofURL:      idProofURL,
-		AddressProofURL: addressProofURL,
-		Status:          StatusPending,
-		CreatedAt:       at,
-		UpdatedAt:       at,
-	}
-	m.byEmployeeID[employeeID] = record
-	copy := *record
-	return &copy, nil
+	approved := *m.record
+	approved.Status = StatusApproved
+	approved.ReviewedBy = &reviewerID
+	approved.ReviewedAt = &at
+	m.latest = &approved
+	return &approved, nil
 }
 
-func newTestService(t *testing.T, employees EmployeeLookup, records RecordStore) *Service {
-	t.Helper()
-	svc := NewService(employees, records)
-	svc.now = func() time.Time {
-		return time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+func (m *mockRecordStore) Reject(_ context.Context, id, reviewerID uuid.UUID, reason string, at time.Time) (*Record, error) {
+	m.rejectCall = true
+	if m.rejectErr != nil {
+		return nil, m.rejectErr
 	}
-	return svc
+	rejected := *m.record
+	rejected.Status = StatusRejected
+	rejected.RejectionReason = &reason
+	rejected.ReviewedBy = &reviewerID
+	rejected.ReviewedAt = &at
+	m.latest = &rejected
+	return &rejected, nil
 }
 
-func TestSubmitSuccess(t *testing.T) {
-	userID := uuid.New()
+func TestService_Approve_syncsVerificationAndReturnsRecord(t *testing.T) {
 	employeeID := uuid.New()
-	svc := newTestService(t, &mockEmployeeLookup{
-		byUserID: map[uuid.UUID]uuid.UUID{userID: employeeID},
-	}, newMockRecordStore())
-
-	res, err := svc.Submit(context.Background(), userID, SubmitRequest{
-		IDProofURL:      "https://cdn.example.com/id.pdf",
-		AddressProofURL: "https://cdn.example.com/address.pdf",
-	})
-	if err != nil {
-		t.Fatalf("Submit() error = %v", err)
+	kycID := uuid.New()
+	reviewerID := uuid.New()
+	store := &mockRecordStore{
+		record: &Record{
+			ID:         kycID,
+			EmployeeID: employeeID,
+			Status:     StatusPending,
+		},
 	}
-	if res.EmployeeID != employeeID || res.Status != StatusPending {
-		t.Fatalf("unexpected response: %+v", res)
+	verification := &mockVerification{}
+
+	svc := NewService(
+		mockEmployees{employeeID: employeeID},
+		store,
+		WithVerificationSync(verification),
+		WithEmployeeUserLookup(mockEmployeeUser{userID: uuid.New()}),
+	)
+
+	res, err := svc.Approve(context.Background(), reviewerID, kycID)
+	if err != nil {
+		t.Fatalf("Approve() error = %v", err)
+	}
+	if !store.approveCall {
+		t.Fatal("Approve() did not call repository Approve")
+	}
+	if !verification.called {
+		t.Fatal("Approve() did not sync employee verification status")
+	}
+	if verification.status != employees.VerificationApproved {
+		t.Fatalf("verification status = %q, want %q", verification.status, employees.VerificationApproved)
+	}
+	if res.Status != StatusApproved {
+		t.Fatalf("response status = %q, want %q", res.Status, StatusApproved)
 	}
 }
 
-func TestSubmitValidation(t *testing.T) {
-	userID := uuid.New()
-	svc := newTestService(t, &mockEmployeeLookup{
-		byUserID: map[uuid.UUID]uuid.UUID{userID: uuid.New()},
-	}, newMockRecordStore())
-
-	_, err := svc.Submit(context.Background(), userID, SubmitRequest{
-		IDProofURL:      "not-a-url",
-		AddressProofURL: "https://cdn.example.com/address.pdf",
+func TestService_Reject_requiresReason(t *testing.T) {
+	svc := NewService(mockEmployees{employeeID: uuid.New()}, &mockRecordStore{
+		record: &Record{ID: uuid.New(), Status: StatusPending},
 	})
+
+	_, err := svc.Reject(context.Background(), uuid.New(), uuid.New(), RejectRequest{Reason: "  "})
 	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("error = %v, want %v", err, ErrValidation)
+		t.Fatalf("Reject() error = %v, want ErrValidation", err)
 	}
 }
 
-func TestSubmitAlreadyExists(t *testing.T) {
-	userID := uuid.New()
-	employeeID := uuid.New()
-	store := newMockRecordStore()
-	store.byEmployeeID[employeeID] = &Record{
-		ID:              uuid.New(),
-		EmployeeID:      employeeID,
-		IDProofURL:      "https://cdn.example.com/id-old.pdf",
-		AddressProofURL: "https://cdn.example.com/address-old.pdf",
-		Status:          StatusPending,
+func TestService_Reject_setsRejectedStatus(t *testing.T) {
+	kycID := uuid.New()
+	store := &mockRecordStore{
+		record: &Record{ID: kycID, EmployeeID: uuid.New(), Status: StatusPending},
 	}
+	svc := NewService(mockEmployees{employeeID: uuid.New()}, store,
+		WithEmployeeUserLookup(mockEmployeeUser{userID: uuid.New()}),
+	)
 
-	svc := newTestService(t, &mockEmployeeLookup{
-		byUserID: map[uuid.UUID]uuid.UUID{userID: employeeID},
-	}, store)
-
-	_, err := svc.Submit(context.Background(), userID, SubmitRequest{
-		IDProofURL:      "https://cdn.example.com/id.pdf",
-		AddressProofURL: "https://cdn.example.com/address.pdf",
-	})
-	if !errors.Is(err, ErrAlreadyExists) {
-		t.Fatalf("error = %v, want %v", err, ErrAlreadyExists)
-	}
-}
-
-func TestSubmitResubmitAfterRejection(t *testing.T) {
-	userID := uuid.New()
-	employeeID := uuid.New()
-	rejectionReason := "blurry document"
-	store := newMockRecordStore()
-	store.byEmployeeID[employeeID] = &Record{
-		ID:              uuid.New(),
-		EmployeeID:      employeeID,
-		IDProofURL:      "https://cdn.example.com/id-old.pdf",
-		AddressProofURL: "https://cdn.example.com/address-old.pdf",
-		Status:          StatusRejected,
-		RejectionReason: &rejectionReason,
-	}
-
-	svc := newTestService(t, &mockEmployeeLookup{
-		byUserID: map[uuid.UUID]uuid.UUID{userID: employeeID},
-	}, store)
-
-	res, err := svc.Submit(context.Background(), userID, SubmitRequest{
-		IDProofURL:      "https://cdn.example.com/id-new.pdf",
-		AddressProofURL: "https://cdn.example.com/address-new.pdf",
-	})
+	res, err := svc.Reject(context.Background(), uuid.New(), kycID, RejectRequest{Reason: "blurry documents"})
 	if err != nil {
-		t.Fatalf("Submit() error = %v", err)
+		t.Fatalf("Reject() error = %v", err)
 	}
-	if res.Status != StatusPending || res.RejectionReason != nil {
-		t.Fatalf("unexpected response: %+v", res)
+	if !store.rejectCall {
+		t.Fatal("Reject() did not call repository Reject")
 	}
-}
-
-func TestGetSuccess(t *testing.T) {
-	userID := uuid.New()
-	employeeID := uuid.New()
-	store := newMockRecordStore()
-	store.byEmployeeID[employeeID] = &Record{
-		ID:              uuid.New(),
-		EmployeeID:      employeeID,
-		IDProofURL:      "https://cdn.example.com/id.pdf",
-		AddressProofURL: "https://cdn.example.com/address.pdf",
-		Status:          StatusPending,
-		CreatedAt:       time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC),
-		UpdatedAt:       time.Date(2026, 5, 25, 10, 0, 0, 0, time.UTC),
+	if res.Status != StatusRejected {
+		t.Fatalf("response status = %q, want %q", res.Status, StatusRejected)
 	}
-
-	svc := newTestService(t, &mockEmployeeLookup{
-		byUserID: map[uuid.UUID]uuid.UUID{userID: employeeID},
-	}, store)
-
-	res, err := svc.Get(context.Background(), userID)
-	if err != nil {
-		t.Fatalf("Get() error = %v", err)
-	}
-	if res.EmployeeID != employeeID || res.Status != StatusPending {
-		t.Fatalf("unexpected response: %+v", res)
+	if res.RejectionReason == nil || strings.TrimSpace(*res.RejectionReason) == "" {
+		t.Fatal("Reject() missing rejection reason")
 	}
 }
 
-func TestGetNotFound(t *testing.T) {
-	userID := uuid.New()
-	svc := newTestService(t, &mockEmployeeLookup{
-		byUserID: map[uuid.UUID]uuid.UUID{userID: uuid.New()},
-	}, newMockRecordStore())
+func TestService_Approve_invalidStatus(t *testing.T) {
+	store := &mockRecordStore{
+		record:     &Record{ID: uuid.New(), Status: StatusApproved},
+		approveErr: ErrInvalidStatus,
+	}
+	svc := NewService(mockEmployees{employeeID: uuid.New()}, store)
 
-	_, err := svc.Get(context.Background(), userID)
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("error = %v, want %v", err, ErrNotFound)
+	_, err := svc.Approve(context.Background(), uuid.New(), uuid.New())
+	if !errors.Is(err, ErrInvalidStatus) {
+		t.Fatalf("Approve() error = %v, want ErrInvalidStatus", err)
 	}
 }

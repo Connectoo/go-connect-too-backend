@@ -1,0 +1,15 @@
+# Public subnet VM — Go API only. Talks to Postgres/MinIO on PRIVATE_HOST.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go-connect-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD:-change-me}@${PRIVATE_HOST:?set PRIVATE_HOST to private VM IP}:5432/go_connect?sslmode=disable
+      S3_ENDPOINT: http://${PRIVATE_HOST}:9000
+    ports:
+      - "127.0.0.1:8080:8080"

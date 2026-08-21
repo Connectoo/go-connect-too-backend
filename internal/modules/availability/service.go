@@ -13,6 +13,7 @@ import (
 // EmployeeProfileStore resolves authenticated users to employee profiles.
 type EmployeeProfileStore interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*employees.Profile, error)
+	GetApprovedByID(ctx context.Context, id uuid.UUID) (*employees.Profile, error)
 }
 
 // Store persists employee availability slots.
@@ -37,6 +38,24 @@ func NewService(profiles EmployeeProfileStore, store Store) *Service {
 		store:    store,
 		now:      func() time.Time { return time.Now().UTC() },
 	}
+}
+
+// ListPublic returns availability for an approved employee profile.
+func (s *Service) ListPublic(ctx context.Context, profileID uuid.UUID) ([]AvailabilityResponse, error) {
+	if _, err := s.profiles.GetApprovedByID(ctx, profileID); err != nil {
+		return nil, err
+	}
+
+	items, err := s.store.ListByEmployeeID(ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]AvailabilityResponse, 0, len(items))
+	for i := range items {
+		out = append(out, *toResponse(&items[i]))
+	}
+	return out, nil
 }
 
 // List returns availability slots for the authenticated employee.

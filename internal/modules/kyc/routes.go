@@ -17,4 +17,14 @@ func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
 		r.Post("/employee/kyc", h.submit)
 		r.Get("/employee/kyc", h.get)
 	})
+
+	r.Route("/admin/kyc", func(r chi.Router) {
+		r.Use(middleware.Authenticate(tokens))
+		r.Use(middleware.RequireRole(users.RoleAdmin))
+
+		r.Get("/", h.listAdmin)
+		r.Get("/{id}", h.getAdmin)
+		r.Patch("/{id}/approve", h.approveAdmin)
+		r.Patch("/{id}/reject", h.rejectAdmin)
+	})
 }

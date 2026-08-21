@@ -7,4 +7,5 @@ var (
 	ErrValidation        = errors.New("validation error")
 	ErrCategoryNotFound  = errors.New("category not found")
 	ErrProfileIncomplete = errors.New("employee profile incomplete")
+	ErrServiceLimit      = errors.New("subscription service limit reached")
 )

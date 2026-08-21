@@ -73,10 +73,26 @@ Phase 1 foundation for the service marketplace modular monolith API.
 
    Raw OpenAPI spec: [http://localhost:8080/api/v1/docs/openapi.yaml](http://localhost:8080/api/v1/docs/openapi.yaml)
 
+## Azure (full-stack testing)
+
+Deploy API, database, storage, and all four web apps on Azure:
+
+```bash
+# Single VM demo: docs/DEPLOYMENT_AZURE.md
+# Single VM in VNet (Postgres + Next.js private): docs/DEPLOYMENT_AZURE_VPC.md
+cp deploy/azure/env.example .env   # on the VM, then edit
+bash deploy/azure/setup-vm.sh
+```
+
 ## Makefile commands
 
 | Command | Description |
 |---------|-------------|
+| `make seed` | Populate demo data + write `docs/SEED_DATA.xlsx` |
+| `make db-clean` | Remove demo seed data (`@yopmail.com` + legacy `@demo.go-connect.local`) |
+| `make db-refresh` | Wipe demo data and re-seed (`db-clean` + `seed` in one step) |
+| `make dev-up` | Start Docker, migrations, API, and all 4 web apps |
+| `make dev-down` | Stop API and all web dev servers |
 | `make run` | Start the API server |
 | `make test` | Run all Go tests |
 | `make migrate-up` | Apply migrations |

@@ -11,8 +11,9 @@ import (
 
 // Config holds application configuration loaded from environment variables.
 type Config struct {
-	AppEnv      string
-	HTTPPort    int
+	AppEnv        string
+	EnableAPIDocs bool
+	HTTPPort      int
 	DatabaseURL string
 	LogLevel    string
 
@@ -24,6 +25,27 @@ type Config struct {
 	JWTRefreshSecret string
 	JWTAccessTTL     time.Duration
 	JWTRefreshTTL    time.Duration
+
+	RazorpayKeyID         string
+	RazorpayKeySecret     string
+	RazorpayWebhookSecret string
+
+	FCMProjectID       string
+	FCMCredentialsJSON string
+
+	SMTPHost string
+	SMTPPort int
+	SMTPUser string
+	SMTPPass string
+	SMTPFrom string
+
+	StorageProvider string
+	S3Bucket        string
+	S3Region        string
+	S3AccessKey     string
+	S3SecretKey     string
+	S3Endpoint      string
+	S3BaseURL       string
 }
 
 // Load reads configuration from the environment.
@@ -32,7 +54,7 @@ type Config struct {
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
-	port, err := strconv.Atoi(getEnv("HTTP_PORT", "8080"))
+	port, err := strconv.Atoi(getEnv("PORT", getEnv("HTTP_PORT", "8080")))
 	if err != nil {
 		return nil, fmt.Errorf("invalid HTTP_PORT: %w", err)
 	}
@@ -77,18 +99,41 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid JWT_REFRESH_TTL_DAYS: %w", err)
 	}
 
+	smtpPort, err := strconv.Atoi(getEnv("SMTP_PORT", "587"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid SMTP_PORT: %w", err)
+	}
+
 	return &Config{
-		AppEnv:            getEnv("APP_ENV", "development"),
-		HTTPPort:          port,
-		DatabaseURL:       databaseURL,
-		LogLevel:          getEnv("LOG_LEVEL", "info"),
-		DBMaxOpenConns:    maxOpen,
-		DBMaxIdleConns:    maxIdle,
-		DBConnMaxLifetime: time.Duration(connLifetimeSec) * time.Second,
-		JWTAccessSecret:   accessSecret,
-		JWTRefreshSecret:  refreshSecret,
-		JWTAccessTTL:      time.Duration(accessTTLMin) * time.Minute,
-		JWTRefreshTTL:     time.Duration(refreshTTLDays) * 24 * time.Hour,
+		AppEnv:                getEnv("APP_ENV", "development"),
+		EnableAPIDocs:         os.Getenv("ENABLE_API_DOCS") == "true",
+		HTTPPort:              port,
+		DatabaseURL:           databaseURL,
+		LogLevel:              getEnv("LOG_LEVEL", "info"),
+		DBMaxOpenConns:        maxOpen,
+		DBMaxIdleConns:        maxIdle,
+		DBConnMaxLifetime:     time.Duration(connLifetimeSec) * time.Second,
+		JWTAccessSecret:       accessSecret,
+		JWTRefreshSecret:      refreshSecret,
+		JWTAccessTTL:          time.Duration(accessTTLMin) * time.Minute,
+		JWTRefreshTTL:         time.Duration(refreshTTLDays) * 24 * time.Hour,
+		RazorpayKeyID:         os.Getenv("RAZORPAY_KEY_ID"),
+		RazorpayKeySecret:     os.Getenv("RAZORPAY_KEY_SECRET"),
+		RazorpayWebhookSecret: os.Getenv("RAZORPAY_WEBHOOK_SECRET"),
+		FCMProjectID:          os.Getenv("FCM_PROJECT_ID"),
+		FCMCredentialsJSON:    os.Getenv("FCM_CREDENTIALS_JSON"),
+		SMTPHost:              os.Getenv("SMTP_HOST"),
+		SMTPPort:              smtpPort,
+		SMTPUser:              os.Getenv("SMTP_USER"),
+		SMTPPass:              os.Getenv("SMTP_PASS"),
+		SMTPFrom:              os.Getenv("SMTP_FROM"),
+		StorageProvider:       getEnv("STORAGE_PROVIDER", ""),
+		S3Bucket:              os.Getenv("S3_BUCKET"),
+		S3Region:              getEnv("S3_REGION", "us-east-1"),
+		S3AccessKey:           os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:           os.Getenv("S3_SECRET_KEY"),
+		S3Endpoint:            os.Getenv("S3_ENDPOINT"),
+		S3BaseURL:             os.Getenv("S3_BASE_URL"),
 	}, nil
 }
 
@@ -97,4 +142,14 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// FCMEnabled reports whether FCM push is configured.
+func (c *Config) FCMEnabled() bool {
+	return c.FCMProjectID != "" && c.FCMCredentialsJSON != ""
+}
+
+// StorageEnabled reports whether S3 storage is configured.
+func (c *Config) StorageEnabled() bool {
+	return c.StorageProvider == "s3" && c.S3Bucket != "" && c.S3Region != ""
 }
