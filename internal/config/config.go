@@ -14,8 +14,8 @@ type Config struct {
 	AppEnv        string
 	EnableAPIDocs bool
 	HTTPPort      int
-	DatabaseURL string
-	LogLevel    string
+	DatabaseURL   string
+	LogLevel      string
 
 	DBMaxOpenConns    int
 	DBMaxIdleConns    int
@@ -25,6 +25,14 @@ type Config struct {
 	JWTRefreshSecret string
 	JWTAccessTTL     time.Duration
 	JWTRefreshTTL    time.Duration
+
+	OTPCodeLength     int
+	OTPCodeTTL        time.Duration
+	OTPResendCooldown time.Duration
+	OTPRequestWindow  time.Duration
+	OTPMaxPerWindow   int
+	OTPMaxAttempts    int
+	OTPProvider       string
 
 	RazorpayKeyID         string
 	RazorpayKeySecret     string
@@ -104,6 +112,36 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid SMTP_PORT: %w", err)
 	}
 
+	otpCodeLength, err := strconv.Atoi(getEnv("OTP_CODE_LENGTH", "6"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid OTP_CODE_LENGTH: %w", err)
+	}
+
+	otpCodeTTLMin, err := strconv.Atoi(getEnv("OTP_CODE_TTL_MINUTES", "5"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid OTP_CODE_TTL_MINUTES: %w", err)
+	}
+
+	otpResendCooldownSec, err := strconv.Atoi(getEnv("OTP_RESEND_COOLDOWN_SECONDS", "60"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid OTP_RESEND_COOLDOWN_SECONDS: %w", err)
+	}
+
+	otpMaxPerWindow, err := strconv.Atoi(getEnv("OTP_MAX_PER_WINDOW", "5"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid OTP_MAX_PER_WINDOW: %w", err)
+	}
+
+	otpWindowMin, err := strconv.Atoi(getEnv("OTP_WINDOW_MINUTES", "15"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid OTP_WINDOW_MINUTES: %w", err)
+	}
+
+	otpMaxAttempts, err := strconv.Atoi(getEnv("OTP_MAX_ATTEMPTS", "5"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid OTP_MAX_ATTEMPTS: %w", err)
+	}
+
 	return &Config{
 		AppEnv:                getEnv("APP_ENV", "development"),
 		EnableAPIDocs:         os.Getenv("ENABLE_API_DOCS") == "true",
@@ -117,6 +155,13 @@ func Load() (*Config, error) {
 		JWTRefreshSecret:      refreshSecret,
 		JWTAccessTTL:          time.Duration(accessTTLMin) * time.Minute,
 		JWTRefreshTTL:         time.Duration(refreshTTLDays) * 24 * time.Hour,
+		OTPCodeLength:         otpCodeLength,
+		OTPCodeTTL:            time.Duration(otpCodeTTLMin) * time.Minute,
+		OTPResendCooldown:     time.Duration(otpResendCooldownSec) * time.Second,
+		OTPRequestWindow:      time.Duration(otpWindowMin) * time.Minute,
+		OTPMaxPerWindow:       otpMaxPerWindow,
+		OTPMaxAttempts:        otpMaxAttempts,
+		OTPProvider:           getEnv("OTP_PROVIDER", ""),
 		RazorpayKeyID:         os.Getenv("RAZORPAY_KEY_ID"),
 		RazorpayKeySecret:     os.Getenv("RAZORPAY_KEY_SECRET"),
 		RazorpayWebhookSecret: os.Getenv("RAZORPAY_WEBHOOK_SECRET"),

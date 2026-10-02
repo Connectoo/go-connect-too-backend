@@ -13,18 +13,24 @@ import (
 )
 
 type mockUserStore struct {
-	users map[string]*users.User
-	byID  map[uuid.UUID]*users.User
+	users   map[string]*users.User
+	byID    map[uuid.UUID]*users.User
+	byPhone map[string]*users.User
 }
 
 func userStoreKey(email, role string) string {
 	return email + "\x00" + role
 }
 
+func phoneStoreKey(phone, role string) string {
+	return phone + "\x00" + role
+}
+
 func newMockUserStore() *mockUserStore {
 	return &mockUserStore{
-		users: make(map[string]*users.User),
-		byID:  make(map[uuid.UUID]*users.User),
+		users:   make(map[string]*users.User),
+		byID:    make(map[uuid.UUID]*users.User),
+		byPhone: make(map[string]*users.User),
 	}
 }
 
@@ -36,11 +42,23 @@ func (m *mockUserStore) Create(_ context.Context, user *users.User) error {
 	copy := *user
 	m.users[key] = &copy
 	m.byID[user.ID] = &copy
+	if copy.Phone != nil {
+		m.byPhone[phoneStoreKey(*copy.Phone, copy.Role)] = &copy
+	}
 	return nil
 }
 
 func (m *mockUserStore) GetByEmailAndRole(_ context.Context, email, role string) (*users.User, error) {
 	user, ok := m.users[userStoreKey(email, role)]
+	if !ok {
+		return nil, users.ErrNotFound
+	}
+	copy := *user
+	return &copy, nil
+}
+
+func (m *mockUserStore) GetByPhoneAndRole(_ context.Context, phone, role string) (*users.User, error) {
+	user, ok := m.byPhone[phoneStoreKey(phone, role)]
 	if !ok {
 		return nil, users.ErrNotFound
 	}
@@ -95,6 +113,13 @@ func testConfig() *config.Config {
 		JWTRefreshSecret: "test-refresh-secret-min-32-characters",
 		JWTAccessTTL:     15 * time.Minute,
 		JWTRefreshTTL:    7 * 24 * time.Hour,
+
+		OTPCodeLength:     6,
+		OTPCodeTTL:        5 * time.Minute,
+		OTPResendCooldown: 60 * time.Second,
+		OTPRequestWindow:  15 * time.Minute,
+		OTPMaxPerWindow:   5,
+		OTPMaxAttempts:    5,
 	}
 }
 

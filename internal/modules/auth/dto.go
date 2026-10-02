@@ -57,6 +57,19 @@ type ChangePasswordRequest struct {
 	NewPassword     string `json:"new_password"`
 }
 
+// OTPRequestRequest starts a phone OTP login flow.
+type OTPRequestRequest struct {
+	Phone string `json:"phone"`
+	Role  string `json:"role"`
+}
+
+// OTPVerifyRequest completes a phone OTP login flow.
+type OTPVerifyRequest struct {
+	Phone string `json:"phone"`
+	Role  string `json:"role"`
+	Code  string `json:"code"`
+}
+
 // TokenPair is returned after login, register, or refresh.
 type TokenPair struct {
 	AccessToken      string `json:"access_token"`

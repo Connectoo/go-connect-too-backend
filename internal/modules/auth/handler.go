@@ -212,6 +212,37 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, "Password changed", nil)
 }
 
+func (h *Handler) otpRequest(w http.ResponseWriter, r *http.Request) {
+	var req OTPRequestRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+
+	if err := h.svc.RequestOTP(r.Context(), req); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "If the phone is registered, an OTP was sent", nil)
+}
+
+func (h *Handler) otpVerify(w http.ResponseWriter, r *http.Request) {
+	var req OTPVerifyRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body", sharederrors.CodeValidationError)
+		return
+	}
+
+	res, err := h.svc.VerifyOTP(r.Context(), req)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, "OTP login successful", res)
+}
+
 func decodeJSON(r *http.Request, dst interface{}) error {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -232,6 +263,10 @@ func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
 		response.Error(w, http.StatusUnauthorized, "Invalid or expired token", sharederrors.CodeInvalidToken)
 	case errors.Is(err, ErrUserInactive):
 		response.Error(w, http.StatusForbidden, "Account is not active", sharederrors.CodeForbidden)
+	case errors.Is(err, ErrOTPExpired), errors.Is(err, ErrOTPInvalid):
+		response.Error(w, http.StatusUnauthorized, "Invalid or expired code", sharederrors.CodeInvalidCredentials)
+	case errors.Is(err, ErrOTPTooManyAttempts), errors.Is(err, ErrOTPRateLimited):
+		response.Error(w, http.StatusTooManyRequests, "Too many requests, try again later", sharederrors.CodeTooManyRequests)
 	case errors.Is(err, users.ErrNotFound):
 		response.Error(w, http.StatusNotFound, "User not found", sharederrors.CodeUnauthorized)
 	default:

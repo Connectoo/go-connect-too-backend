@@ -15,6 +15,8 @@ var ExpectedAPIRoutes = []string{
 	"POST /auth/forgot-password",
 	"POST /auth/reset-password",
 	"POST /auth/verify-email",
+	"POST /auth/otp/request",
+	"POST /auth/otp/verify",
 	"POST /auth/resend-verification",
 	"POST /auth/change-password",
 	"GET /public/home",

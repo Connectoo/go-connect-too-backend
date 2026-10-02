@@ -90,9 +90,12 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		Pass: cfg.SMTPPass,
 		From: cfg.SMTPFrom,
 	})
+	otpSender := auth.OTPSender(auth.NoopOTPSender{})
 	authSvc := auth.NewService(cfg, userRepo, registrar, authRepo, tokenManager,
 		auth.WithLifecycleStore(authRepo),
 		auth.WithEmailSender(emailSender),
+		auth.WithOTPStore(authRepo),
+		auth.WithOTPSender(otpSender),
 	)
 	authHandler := auth.NewHandler(authSvc, log)
 	userStatusUpdater := users.NewStatusUpdater(userRepo)

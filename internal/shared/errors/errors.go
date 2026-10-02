@@ -12,4 +12,5 @@ const (
 	CodeNotFound           = "NOT_FOUND"
 	CodeInvalidToken       = "INVALID_TOKEN"
 	CodeInvalidCredentials = "INVALID_CREDENTIALS"
+	CodeTooManyRequests    = "TOO_MANY_REQUESTS"
 )

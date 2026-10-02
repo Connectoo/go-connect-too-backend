@@ -21,6 +21,7 @@ import (
 type UserStore interface {
 	Create(ctx context.Context, user *users.User) error
 	GetByEmailAndRole(ctx context.Context, email, role string) (*users.User, error)
+	GetByPhoneAndRole(ctx context.Context, phone, role string) (*users.User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*users.User, error)
 }
 
@@ -40,6 +41,8 @@ type Service struct {
 	refresh         RefreshStore
 	lifecycle       LifecycleStore
 	mailer          EmailSender
+	otp             OTPStore
+	otpSender       OTPSender
 	tokens          *security.TokenManager
 	refreshTTL      time.Duration
 	refreshSecret   []byte
@@ -78,6 +81,16 @@ func WithLifecycleStore(store LifecycleStore) ServiceOption {
 // WithEmailSender configures transactional email delivery.
 func WithEmailSender(sender EmailSender) ServiceOption {
 	return func(s *Service) { s.mailer = sender }
+}
+
+// WithOTPStore configures OTP login code persistence.
+func WithOTPStore(store OTPStore) ServiceOption {
+	return func(s *Service) { s.otp = store }
+}
+
+// WithOTPSender configures OTP code delivery (SMS).
+func WithOTPSender(sender OTPSender) ServiceOption {
+	return func(s *Service) { s.otpSender = sender }
 }
 
 // RegisterCustomer creates a customer account and issues tokens.
