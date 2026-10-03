@@ -125,18 +125,19 @@ func newOTPTestService(t *testing.T, store *mockUserStore, otpStore *mockOTPStor
 func seedOTPUser(t *testing.T, store *mockUserStore, status string) *users.User {
 	t.Helper()
 	phone := testOTPPhone
+	email := "otp@example.com"
 	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	user := &users.User{
 		ID:        uuid.New(),
 		Name:      "OTP User",
-		Email:     "otp@example.com",
+		Email:     &email,
 		Phone:     &phone,
 		Role:      testOTPRole,
 		Status:    status,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	store.users[userStoreKey(user.Email, user.Role)] = user
+	store.users[userStoreKey(email, user.Role)] = user
 	store.byID[user.ID] = user
 	store.byPhone[phoneStoreKey(phone, user.Role)] = user
 	return user
@@ -299,21 +300,97 @@ func TestRequestOTPMaxPerWindow(t *testing.T) {
 	}
 }
 
-func TestRequestOTPUnknownPhoneNeutral(t *testing.T) {
+func TestRequestOTPUnknownPhoneSendsCodeAndRateLimits(t *testing.T) {
 	store := newMockUserStore()
 	otpStore := newMockOTPStore()
 	sender := &mockOTPSender{enabled: true}
 	svc := newOTPTestService(t, store, otpStore, sender)
 
-	// no user seeded: must return nil and store/send nothing
+	// Phone-only registration: an unregistered phone still gets a code so the
+	// account can be auto-created on verify. Response stays neutral (nil error).
 	if err := svc.RequestOTP(context.Background(), OTPRequestRequest{Phone: testOTPPhone, Role: testOTPRole}); err != nil {
 		t.Fatalf("RequestOTP() error = %v, want nil (neutral)", err)
 	}
-	if len(otpStore.codes) != 0 {
-		t.Fatalf("expected no stored codes, got %d", len(otpStore.codes))
+	if len(otpStore.codes) != 1 {
+		t.Fatalf("expected one stored code for unregistered phone, got %d", len(otpStore.codes))
 	}
-	if sender.calls != 0 {
-		t.Fatalf("expected no codes sent, got %d", sender.calls)
+	if sender.calls != 1 {
+		t.Fatalf("expected one code sent, got %d", sender.calls)
+	}
+
+	// Rate limiting must engage for the unregistered phone too (anti SMS-bomb):
+	// an immediate second request hits the resend cooldown.
+	err := svc.RequestOTP(context.Background(), OTPRequestRequest{Phone: testOTPPhone, Role: testOTPRole})
+	if err != ErrOTPRateLimited {
+		t.Fatalf("error = %v, want %v", err, ErrOTPRateLimited)
+	}
+}
+
+func TestVerifyOTPAutoCreatesPhoneOnlyUser(t *testing.T) {
+	store := newMockUserStore()
+	otpStore := newMockOTPStore()
+	sender := &mockOTPSender{enabled: true}
+	svc := newOTPTestService(t, store, otpStore, sender)
+
+	// No user seeded: request + verify must auto-create a phone-only account.
+	code := requestAndGetCode(t, svc, sender)
+
+	res, err := svc.VerifyOTP(context.Background(), OTPVerifyRequest{Phone: testOTPPhone, Role: testOTPRole, Code: code})
+	if err != nil {
+		t.Fatalf("VerifyOTP() error = %v", err)
+	}
+	if res.Tokens.AccessToken == "" || res.Tokens.RefreshToken == "" {
+		t.Fatal("expected JWT token pair")
+	}
+	if res.User == nil || res.User.Role != testOTPRole {
+		t.Fatalf("unexpected user: %+v", res.User)
+	}
+	if res.User.Email != "" {
+		t.Fatalf("phone-only user email = %q, want empty", res.User.Email)
+	}
+
+	// The account (and its profile row, via the mock registrar) now exists.
+	created, err := store.GetByPhoneAndRole(context.Background(), testOTPPhone, testOTPRole)
+	if err != nil {
+		t.Fatalf("GetByPhoneAndRole() error = %v (expected auto-created user)", err)
+	}
+	if created.Email != nil {
+		t.Fatalf("created user email = %v, want nil", created.Email)
+	}
+	if created.PasswordHash != nil {
+		t.Fatalf("created user password_hash = %v, want nil", created.PasswordHash)
+	}
+	if created.Status != users.StatusActive {
+		t.Fatalf("created user status = %q, want active", created.Status)
+	}
+	if otpStore.codes[0].ConsumedAt == nil {
+		t.Fatal("expected OTP code to be marked consumed")
+	}
+}
+
+func TestVerifyOTPExistingUserUnchanged(t *testing.T) {
+	store := newMockUserStore()
+	seeded := seedOTPUser(t, store, users.StatusActive)
+	otpStore := newMockOTPStore()
+	sender := &mockOTPSender{enabled: true}
+	svc := newOTPTestService(t, store, otpStore, sender)
+
+	code := requestAndGetCode(t, svc, sender)
+
+	res, err := svc.VerifyOTP(context.Background(), OTPVerifyRequest{Phone: testOTPPhone, Role: testOTPRole, Code: code})
+	if err != nil {
+		t.Fatalf("VerifyOTP() error = %v", err)
+	}
+	if res.User == nil || res.User.ID != seeded.ID {
+		t.Fatalf("expected existing user %s, got %+v", seeded.ID, res.User)
+	}
+	// No duplicate account was created.
+	loaded, err := store.GetByPhoneAndRole(context.Background(), testOTPPhone, testOTPRole)
+	if err != nil {
+		t.Fatalf("GetByPhoneAndRole() error = %v", err)
+	}
+	if loaded.ID != seeded.ID {
+		t.Fatalf("account id = %s, want %s (no duplicate)", loaded.ID, seeded.ID)
 	}
 }
 

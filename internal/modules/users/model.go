@@ -20,9 +20,9 @@ const (
 type User struct {
 	ID              uuid.UUID
 	Name            string
-	Email           string
+	Email           *string
 	Phone           *string
-	PasswordHash    string
+	PasswordHash    *string
 	Role            string
 	Status          string
 	EmailVerifiedAt *time.Time

@@ -82,8 +82,11 @@ func (s *Service) otpMaxAttempts() int {
 
 // RequestOTP generates and sends a one-time login code for a phone+role.
 // It always returns a neutral result: callers must not learn whether the phone
-// is registered. A code is only generated/stored/sent when a matching active
-// user exists.
+// is registered. Because registration is phone-only, an unregistered phone also
+// gets a code (so the account can be auto-created on verify); this keeps the
+// response non-enumerable while still engaging per-phone+role rate limiting for
+// unregistered phones. An EXISTING but suspended/deactivated account is the only
+// case that is silently skipped, so a disabled account cannot be OTP-logged-in.
 func (s *Service) RequestOTP(ctx context.Context, req OTPRequestRequest) error {
 	if s.otp == nil {
 		return ErrOTPNotConfigured
@@ -96,7 +99,8 @@ func (s *Service) RequestOTP(ctx context.Context, req OTPRequestRequest) error {
 
 	now := s.now()
 
-	// Rate limiting: cooldown + max-per-window (keyed on phone+role).
+	// Rate limiting: cooldown + max-per-window (keyed on phone+role). Runs before
+	// any user lookup so it engages for unregistered phones too (anti SMS-bomb).
 	since := now.Add(-s.otpRequestWindow())
 	count, err := s.otp.CountOTPRequestsSince(ctx, phone, role, since)
 	if err != nil {
@@ -113,17 +117,15 @@ func (s *Service) RequestOTP(ctx context.Context, req OTPRequestRequest) error {
 		return ErrOTPRateLimited
 	}
 
+	// If an account already exists, only permit OTP for one whose status allows
+	// login. For an unregistered phone (ErrNotFound) proceed: the account will be
+	// auto-created on first successful verify.
 	user, err := s.users.GetByPhoneAndRole(ctx, phone, role)
-	if err != nil {
-		if errors.Is(err, users.ErrNotFound) {
-			// Neutral response: do not reveal whether the phone is registered.
-			return nil
-		}
+	if err != nil && !errors.Is(err, users.ErrNotFound) {
 		return err
 	}
-
-	// Only allow OTP login for accounts whose status permits login.
-	if user.Status != users.StatusActive || user.DeactivatedAt != nil {
+	if user != nil && (user.Status != users.StatusActive || user.DeactivatedAt != nil) {
+		// Neutral response: do not send a code for a disabled account.
 		return nil
 	}
 
@@ -190,10 +192,15 @@ func (s *Service) VerifyOTP(ctx context.Context, req OTPVerifyRequest) (*AuthRes
 
 	user, err := s.users.GetByPhoneAndRole(ctx, phone, role)
 	if err != nil {
-		if errors.Is(err, users.ErrNotFound) {
-			return nil, ErrOTPInvalid
+		if !errors.Is(err, users.ErrNotFound) {
+			return nil, err
 		}
-		return nil, err
+		// Phone-only registration: no account exists for this phone+role yet, so
+		// create one (email/password nil) now that the OTP code is validated.
+		user, err = s.createPhoneOnlyUser(ctx, phone, role, now)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if user.Status != users.StatusActive || user.DeactivatedAt != nil {
 		return nil, ErrUserInactive
@@ -212,6 +219,43 @@ func (s *Service) VerifyOTP(ctx context.Context, req OTPVerifyRequest) (*AuthRes
 		User:   toUserResponse(user),
 		Tokens: *tokens,
 	}, nil
+}
+
+// createPhoneOnlyUser auto-provisions a phone-only account (no email, no
+// password) via the registrar so the role-specific profile row is created in the
+// same transaction. It is idempotent under concurrent verifies: if another verify
+// already inserted the row, users_phone_role_unique surfaces ErrDuplicatePhone and
+// we re-load the existing user instead.
+func (s *Service) createPhoneOnlyUser(ctx context.Context, phone, role string, now time.Time) (*users.User, error) {
+	phonePtr := phone
+	user := &users.User{
+		ID:        uuid.New(),
+		Name:      "",
+		Email:     nil,
+		Phone:     &phonePtr,
+		Role:      role,
+		Status:    users.StatusActive,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	var err error
+	switch role {
+	case users.RoleCustomer:
+		err = s.registrar.RegisterCustomer(ctx, user)
+	case users.RoleEmployee:
+		err = s.registrar.RegisterEmployee(ctx, user)
+	default:
+		return nil, ErrValidation
+	}
+	if err != nil {
+		if errors.Is(err, users.ErrDuplicatePhone) {
+			// Concurrent verify already created the account; load and continue.
+			return s.users.GetByPhoneAndRole(ctx, phone, role)
+		}
+		return nil, err
+	}
+	return user, nil
 }
 
 // generateNumericCode returns a zero-padded random numeric code of the given length.

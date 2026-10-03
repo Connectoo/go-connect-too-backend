@@ -21,9 +21,11 @@ These capabilities are complete and need no Phase 1 work:
 
 - **Auth (email/password + JWT):** register/login (customer, employee, admin),
   refresh, logout, `me`, email verify/resend, forgot/reset/change password.
-- **Auth (phone OTP login):** `POST /auth/otp/request` + `POST /auth/otp/verify`
-  for customer and employee — hashed single-use codes with expiry, attempt caps,
-  and per-phone rate limiting; verify issues the same JWT pair. (Google/OAuth still open.)
+- **Auth (phone OTP registration + login):** `POST /auth/otp/request` +
+  `POST /auth/otp/verify` for customer and employee — hashed single-use codes with
+  expiry, attempt caps, and per-phone rate limiting (incl. unregistered phones);
+  verify auto-creates a phone-only account on first success and issues the same JWT
+  pair. Email/password remains a parallel path. (Google/OAuth still open.)
 - **Discovery:** `public/home`, categories, providers, services; `search/services`,
   `search/employees` (location-aware).
 - **Provider profile:** `employee/profile` get/update, public profile, badges,
@@ -51,11 +53,13 @@ These capabilities are complete and need no Phase 1 work:
    - Support the intended methods (online via Razorpay; cash settled at completion).
    - Reuse the existing `payments.RazorpayGateway` and `POST /webhooks/razorpay`.
 
-2. **Auth model decision (🚧 OTP shipped; Google open)**
-   Backend is email/password + JWT, now plus phone OTP login.
+2. **Auth model decision (🚧 OTP registration + login shipped; Google open)**
+   Backend is email/password + JWT, now plus phone-only OTP registration and login.
    - OTP: ✅ shipped — phone send-code + verify-code endpoints, OTP store with
-     expiry/rate limit, issues the same JWT pair on success (SMS delivery behind
-     the `OTPSender` interface; no-op/log sender in dev).
+     expiry/rate limit; verify **auto-creates a phone-only account** (no email/
+     password) when the phone+role is new, then issues the same JWT pair. Email/
+     password stays a parallel path. (SMS delivery behind the `OTPSender`
+     interface; no-op/log sender in dev.)
    - Google: ❌ open — OAuth token verification endpoint, link/create user, issue JWT pair.
 
 3. **Quote flow decision (❌ if required)**

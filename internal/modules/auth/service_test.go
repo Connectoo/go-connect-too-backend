@@ -35,16 +35,24 @@ func newMockUserStore() *mockUserStore {
 }
 
 func (m *mockUserStore) Create(_ context.Context, user *users.User) error {
-	key := userStoreKey(user.Email, user.Role)
-	if _, ok := m.users[key]; ok {
-		return users.ErrDuplicateEmail
-	}
 	copy := *user
-	m.users[key] = &copy
-	m.byID[user.ID] = &copy
-	if copy.Phone != nil {
-		m.byPhone[phoneStoreKey(*copy.Phone, copy.Role)] = &copy
+	// Phone-only accounts (nil email) are keyed by phone so multiple of them can
+	// coexist; email/password accounts are keyed by email+role.
+	if user.Email != nil {
+		key := userStoreKey(*user.Email, user.Role)
+		if _, ok := m.users[key]; ok {
+			return users.ErrDuplicateEmail
+		}
+		m.users[key] = &copy
 	}
+	if copy.Phone != nil {
+		phoneKey := phoneStoreKey(*copy.Phone, copy.Role)
+		if _, ok := m.byPhone[phoneKey]; ok {
+			return users.ErrDuplicatePhone
+		}
+		m.byPhone[phoneKey] = &copy
+	}
+	m.byID[user.ID] = &copy
 	return nil
 }
 
@@ -253,6 +261,38 @@ func TestLoginWrongPassword(t *testing.T) {
 	_, err = svc.LoginCustomer(context.Background(), LoginRequest{
 		Email:    "john2@example.com",
 		Password: "wrong-password",
+	})
+	if err != ErrInvalidCredentials {
+		t.Fatalf("error = %v, want %v", err, ErrInvalidCredentials)
+	}
+}
+
+func TestPasswordLoginRejectsPhoneOnlyAccount(t *testing.T) {
+	store := newMockUserStore()
+	svc := newTestService(t, store, newMockRefreshStore())
+
+	// Seed a phone-only account directly: no email, no password hash.
+	phone := "+15551230000"
+	email := "phoneonly@example.com"
+	id := uuid.New()
+	seeded := &users.User{
+		ID:           id,
+		Name:         "",
+		Email:        nil,
+		Phone:        &phone,
+		PasswordHash: nil,
+		Role:         users.RoleCustomer,
+		Status:       users.StatusActive,
+	}
+	// Index by an email key so login's GetByEmailAndRole can find it; the point is
+	// that even when found, a nil password hash must fail cleanly (not panic/500).
+	store.users[userStoreKey(email, users.RoleCustomer)] = seeded
+	store.byID[id] = seeded
+	store.byPhone[phoneStoreKey(phone, users.RoleCustomer)] = seeded
+
+	_, err := svc.LoginCustomer(context.Background(), LoginRequest{
+		Email:    email,
+		Password: "any-password",
 	})
 	if err != ErrInvalidCredentials {
 		t.Fatalf("error = %v, want %v", err, ErrInvalidCredentials)

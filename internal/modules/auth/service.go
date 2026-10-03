@@ -114,12 +114,13 @@ func (s *Service) register(ctx context.Context, name, email string, phone *strin
 	}
 
 	now := s.now()
+	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
 	user := &users.User{
 		ID:           uuid.New(),
 		Name:         strings.TrimSpace(name),
-		Email:        strings.ToLower(strings.TrimSpace(email)),
+		Email:        &normalizedEmail,
 		Phone:        normalizePhone(phone),
-		PasswordHash: hash,
+		PasswordHash: &hash,
 		Role:         role,
 		Status:       users.StatusActive,
 		CreatedAt:    now,
@@ -178,7 +179,7 @@ func (s *Service) login(ctx context.Context, req LoginRequest, role string) (*Au
 		return nil, err
 	}
 
-	if err := security.CheckPassword(user.PasswordHash, req.Password); err != nil {
+	if err := security.CheckPassword(derefOr(user.PasswordHash, ""), req.Password); err != nil {
 		return nil, ErrInvalidCredentials
 	}
 
@@ -315,6 +316,14 @@ func validateRegister(name, email, password string) error {
 	return nil
 }
 
+// derefOr returns the pointed-to string, or fallback when the pointer is nil.
+func derefOr(p *string, fallback string) string {
+	if p == nil {
+		return fallback
+	}
+	return *p
+}
+
 func normalizePhone(phone *string) *string {
 	if phone == nil {
 		return nil
@@ -330,7 +339,7 @@ func toUserResponse(user *users.User) *UserResponse {
 	return &UserResponse{
 		ID:        user.ID,
 		Name:      user.Name,
-		Email:     user.Email,
+		Email:     derefOr(user.Email, ""),
 		Phone:     user.Phone,
 		Role:      user.Role,
 		Status:    user.Status,

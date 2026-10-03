@@ -82,7 +82,7 @@ type TokenPair struct {
 type UserResponse struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
-	Email     string    `json:"email"`
+	Email     string    `json:"email,omitempty"`
 	Phone     *string   `json:"phone,omitempty"`
 	Role      string    `json:"role"`
 	Status    string    `json:"status"`

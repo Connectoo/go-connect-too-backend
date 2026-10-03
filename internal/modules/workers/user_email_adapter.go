@@ -28,5 +28,8 @@ func (a *UserEmailAdapter) GetByID(ctx context.Context, id uuid.UUID) (string, e
 		}
 		return "", err
 	}
-	return user.Email, nil
+	if user.Email == nil {
+		return "", nil
+	}
+	return *user.Email, nil
 }

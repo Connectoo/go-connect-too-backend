@@ -9,6 +9,8 @@ import (
 	"github.com/google/uuid"
 )
 
+func strPtr(s string) *string { return &s }
+
 type mockUserStore struct {
 	users map[uuid.UUID]*User
 }
@@ -104,7 +106,7 @@ func (m *mockAddressStore) ClearDefaultAddresses(_ context.Context, userID uuid.
 func TestService_UpdateProfile_customerOnly(t *testing.T) {
 	userID := uuid.New()
 	store := &mockUserStore{users: map[uuid.UUID]*User{
-		userID: {ID: userID, Name: "A", Email: "a@example.com", Role: RoleCustomer, Status: StatusActive},
+		userID: {ID: userID, Name: "A", Email: strPtr("a@example.com"), Role: RoleCustomer, Status: StatusActive},
 	}}
 	svc := NewService(store, newMockAddressStore())
 

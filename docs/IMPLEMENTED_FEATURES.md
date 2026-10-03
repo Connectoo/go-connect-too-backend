@@ -28,8 +28,16 @@ role enforcement, admin audit logging.
 ---
 
 ## Auth (`auth`)
-Email + password with JWT access/refresh tokens, plus phone + OTP login
-(customer and employee) that issues the same JWT token pair.
+Two parallel account paths, both issuing the same JWT access/refresh token pair:
+
+- **Phone-only (OTP) registration + login** (customer and employee): enter phone →
+  `POST /auth/otp/request` → `POST /auth/otp/verify`. If no account exists for that
+  phone + role, it is **auto-created on the first successful verify** (email and
+  password left empty) and tokens are issued; existing accounts just log in. No
+  separate registration call is needed for the mobile flow.
+- **Email + password** registration and login remain fully supported in parallel
+  (used by admin and existing users). A phone-only account has no password, so
+  password login against it fails with invalid-credentials (never a 500).
 
 - `POST /auth/register/customer`
 - `POST /auth/register/employee`
@@ -42,8 +50,8 @@ Email + password with JWT access/refresh tokens, plus phone + OTP login
 - `POST /auth/forgot-password`
 - `POST /auth/reset-password`
 - `POST /auth/verify-email`
-- `POST /auth/otp/request` — request a one-time login code for a phone + role (neutral response; rate limited)
-- `POST /auth/otp/verify` — verify the code and receive the standard `AuthResponse` (JWT access/refresh + user)
+- `POST /auth/otp/request` — request a one-time login code for a phone + role (neutral response; rate limited per phone + role **including unregistered phones**, so a code is sent even for a new phone to enable auto-create on verify)
+- `POST /auth/otp/verify` — verify the code and receive the standard `AuthResponse` (JWT access/refresh + user); **auto-creates a phone-only account** if none exists for that phone + role
 - `POST /auth/resend-verification` (auth)
 - `POST /auth/change-password` (auth)
 
