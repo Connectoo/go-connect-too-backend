@@ -78,4 +78,22 @@ Branch: `azure`. First iteration (no `review.json` existed).
 - Tests updated for the `*string` model (auth, users, admin) plus the new cases above.
 - Docs: `docs/IMPLEMENTED_FEATURES.md` and `docs/PHASE_PLAN.md` updated.
 
-No new routes; request bodies unchanged, so OpenAPI/parity untouched.
+No new routes; request bodies unchanged.
+
+## Follow-up: OpenAPI/Swagger for the OTP endpoints
+
+Per an added requirement, `internal/app/spec/openapi.yaml` was updated so the OTP
+endpoints render real input fields in Swagger UI (they were generic `API`-tagged
+stubs with no requestBody):
+
+- `/auth/otp/request`: tag `Auth`, summary "Request login OTP", operationId
+  `requestOTP`, `requestBody` → `OTPRequestRequest`, 200 → `SuccessEnvelope`.
+- `/auth/otp/verify`: tag `Auth`, summary "Verify login OTP", operationId
+  `verifyOTP`, `requestBody` → `OTPVerifyRequest`, 200 → `AuthSuccessEnvelope`
+  (returns the token pair + user; auto-creates the account if new).
+- New schemas `OTPRequestRequest` (required phone, role) and `OTPVerifyRequest`
+  (required phone, role, code) with examples and a role enum [customer, employee],
+  modeled on the existing RegisterRequest/LoginRequest. The phone-only changes did
+  not add any optional request fields, so the schemas match the Go DTOs exactly.
+- Route paths unchanged; `go test ./internal/app/...` (parity test) stays green.
+  `openapi.yaml` re-validated as well-formed YAML.
