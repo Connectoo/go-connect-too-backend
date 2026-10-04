@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"log/slog"
 	"math/big"
 	"strings"
 	"time"
@@ -37,6 +38,33 @@ func (NoopOTPSender) Enabled() bool { return false }
 
 // Send implements OTPSender.
 func (NoopOTPSender) Send(string, string) error { return nil }
+
+// LoggingOTPSender writes OTP codes to the logger instead of sending an SMS.
+// It is intended for local development and testing ONLY, so that the OTP
+// request/verify flow can be exercised without a real SMS provider wired up.
+// Never enable it in production: it exposes login codes in the logs.
+type LoggingOTPSender struct {
+	log *slog.Logger
+}
+
+// NewLoggingOTPSender builds a dev OTP sender that logs the generated code.
+func NewLoggingOTPSender(log *slog.Logger) LoggingOTPSender {
+	return LoggingOTPSender{log: log}
+}
+
+// Enabled implements OTPSender.
+func (LoggingOTPSender) Enabled() bool { return true }
+
+// Send implements OTPSender by logging the code (dev only).
+func (s LoggingOTPSender) Send(phone, code string) error {
+	if s.log != nil {
+		s.log.Warn("dev OTP code (not sent via SMS)",
+			slog.String("phone", phone),
+			slog.String("code", code),
+		)
+	}
+	return nil
+}
 
 func (s *Service) otpCodeLength() int {
 	if s.cfg != nil && s.cfg.OTPCodeLength > 0 {

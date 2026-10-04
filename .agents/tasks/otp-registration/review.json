@@ -1,0 +1,18 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "Unregistered-phone SMS-bomb gap now closed",
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "detail": "The prior OTP-login review's defense-in-depth gap is resolved: RequestOTP now runs the cooldown and max-per-window checks BEFORE the user lookup and stores a code for any phone+role, so an unregistered phone increments the per-phone+role counters and trips ErrOTPRateLimited. Verified in code and by TestRequestOTPUnknownPhoneSendsCodeAndRateLimits. No action required; recorded to confirm closure."
+    },
+    {
+      "label": "Non-constant-time OTP hash comparison (pre-existing, out of scope)",
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "detail": "VerifyOTP compares the computed code hash to the stored hash with != rather than subtle.ConstantTimeCompare. This is unchanged from the base OTP-login commit (270e1bd) and not touched by this diff; low risk (keyed sha256). Noted only for continuity, not introduced here."
+    }
+  ],
+  "reviewDoc": "/Users/mustafa/Desktop/projects/go-connect-too-backend/.agents/tasks/otp-registration/review.md"
+}

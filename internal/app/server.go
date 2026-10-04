@@ -91,6 +91,11 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		From: cfg.SMTPFrom,
 	})
 	otpSender := auth.OTPSender(auth.NoopOTPSender{})
+	if cfg.AppEnv != "production" {
+		// Dev/test only: log the generated OTP code so the phone login/registration
+		// flow can be exercised without a real SMS provider. Never used in production.
+		otpSender = auth.NewLoggingOTPSender(log)
+	}
 	authSvc := auth.NewService(cfg, userRepo, registrar, authRepo, tokenManager,
 		auth.WithLifecycleStore(authRepo),
 		auth.WithEmailSender(emailSender),

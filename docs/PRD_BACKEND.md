@@ -401,7 +401,6 @@ The backend is release-ready when:
 
 - `internal/app/spec/openapi.yaml` — wire contract.
 - `internal/app/expected_routes.go` — registered route expectation.
-- `docs/UI_INVENTORY.md` — API/route inventory and historical screen plan; its UI status and customer/employee web-portal plan are non-normative for this release.
 - `docs/DEFERRED_SCOPE.md` — currently deferred backend capabilities.
 
 If this PRD conflicts with an approved versioned API contract, the approved contract controls wire behavior until the conflict is resolved through product and engineering change control.
