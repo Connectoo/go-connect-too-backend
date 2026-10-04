@@ -55,8 +55,26 @@ Two parallel account paths, both issuing the same JWT access/refresh token pair:
 - `POST /auth/resend-verification` (auth)
 - `POST /auth/change-password` (auth)
 
-> Not implemented: Google/OAuth social login. (Shipped OTP delivery uses a
-> no-op/log sender in dev; a real SMS provider plugs in behind the `OTPSender` interface.)
+### OTP delivery (pluggable via `OTP_PROVIDER`)
+
+The backend always generates, hashes, stores, expires, and verifies the OTP
+itself; the provider is only a delivery transport. `OTP_PROVIDER` selects it:
+
+- empty (default) — dev/log sender in non-production (logs the code, never sends
+  it), no-op in production.
+- `twilio` — SMS via the Twilio Messages REST API (`net/http`, no SDK). Requires
+  `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and either `TWILIO_FROM_NUMBER` or
+  `TWILIO_MESSAGING_SERVICE_SID`. `OTP_SMS_TEMPLATE` substitutes the code into
+  `{code}`. Phones are normalized to E.164 with a leading `+`.
+- `email` — SMTP fallback reusing the configured `SMTP_*` sender. DEV/TESTING
+  only: it emails the code to the address supplied in the phone field, so
+  genuine phone-only users (who have no email) cannot be reached this way.
+
+Caveats: a Twilio **trial** account can only send to verified numbers, and
+production SMS to Indian (`+91`) numbers additionally requires India DLT
+registration (regulatory, outside this codebase).
+
+> Not implemented: Google/OAuth social login.
 
 ---
 

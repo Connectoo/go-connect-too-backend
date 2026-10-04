@@ -58,8 +58,10 @@ These capabilities are complete and need no Phase 1 work:
    - OTP: ✅ shipped — phone send-code + verify-code endpoints, OTP store with
      expiry/rate limit; verify **auto-creates a phone-only account** (no email/
      password) when the phone+role is new, then issues the same JWT pair. Email/
-     password stays a parallel path. (SMS delivery behind the `OTPSender`
-     interface; no-op/log sender in dev.)
+     password stays a parallel path. OTP SMS delivery via Twilio is wired behind
+     the `OTPSender` interface, selected by `OTP_PROVIDER` (pending a Twilio
+     account/number + India DLT for `+91` production); an SMTP email fallback is
+     available, and dev still uses the no-op/log sender.
    - Google: ❌ open — OAuth token verification endpoint, link/create user, issue JWT pair.
 
 3. **Quote flow decision (❌ if required)**

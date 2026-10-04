@@ -33,6 +33,12 @@ type Config struct {
 	OTPMaxPerWindow   int
 	OTPMaxAttempts    int
 	OTPProvider       string
+	OTPSMSTemplate    string
+
+	TwilioAccountSID          string
+	TwilioAuthToken           string
+	TwilioFromNumber          string
+	TwilioMessagingServiceSID string
 
 	RazorpayKeyID         string
 	RazorpayKeySecret     string
@@ -143,42 +149,48 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		AppEnv:                getEnv("APP_ENV", "development"),
-		EnableAPIDocs:         os.Getenv("ENABLE_API_DOCS") == "true",
-		HTTPPort:              port,
-		DatabaseURL:           databaseURL,
-		LogLevel:              getEnv("LOG_LEVEL", "info"),
-		DBMaxOpenConns:        maxOpen,
-		DBMaxIdleConns:        maxIdle,
-		DBConnMaxLifetime:     time.Duration(connLifetimeSec) * time.Second,
-		JWTAccessSecret:       accessSecret,
-		JWTRefreshSecret:      refreshSecret,
-		JWTAccessTTL:          time.Duration(accessTTLMin) * time.Minute,
-		JWTRefreshTTL:         time.Duration(refreshTTLDays) * 24 * time.Hour,
-		OTPCodeLength:         otpCodeLength,
-		OTPCodeTTL:            time.Duration(otpCodeTTLMin) * time.Minute,
-		OTPResendCooldown:     time.Duration(otpResendCooldownSec) * time.Second,
-		OTPRequestWindow:      time.Duration(otpWindowMin) * time.Minute,
-		OTPMaxPerWindow:       otpMaxPerWindow,
-		OTPMaxAttempts:        otpMaxAttempts,
-		OTPProvider:           getEnv("OTP_PROVIDER", ""),
-		RazorpayKeyID:         os.Getenv("RAZORPAY_KEY_ID"),
-		RazorpayKeySecret:     os.Getenv("RAZORPAY_KEY_SECRET"),
-		RazorpayWebhookSecret: os.Getenv("RAZORPAY_WEBHOOK_SECRET"),
-		FCMProjectID:          os.Getenv("FCM_PROJECT_ID"),
-		FCMCredentialsJSON:    os.Getenv("FCM_CREDENTIALS_JSON"),
-		SMTPHost:              os.Getenv("SMTP_HOST"),
-		SMTPPort:              smtpPort,
-		SMTPUser:              os.Getenv("SMTP_USER"),
-		SMTPPass:              os.Getenv("SMTP_PASS"),
-		SMTPFrom:              os.Getenv("SMTP_FROM"),
-		StorageProvider:       getEnv("STORAGE_PROVIDER", ""),
-		S3Bucket:              os.Getenv("S3_BUCKET"),
-		S3Region:              getEnv("S3_REGION", "us-east-1"),
-		S3AccessKey:           os.Getenv("S3_ACCESS_KEY"),
-		S3SecretKey:           os.Getenv("S3_SECRET_KEY"),
-		S3Endpoint:            os.Getenv("S3_ENDPOINT"),
-		S3BaseURL:             os.Getenv("S3_BASE_URL"),
+		AppEnv:            getEnv("APP_ENV", "development"),
+		EnableAPIDocs:     os.Getenv("ENABLE_API_DOCS") == "true",
+		HTTPPort:          port,
+		DatabaseURL:       databaseURL,
+		LogLevel:          getEnv("LOG_LEVEL", "info"),
+		DBMaxOpenConns:    maxOpen,
+		DBMaxIdleConns:    maxIdle,
+		DBConnMaxLifetime: time.Duration(connLifetimeSec) * time.Second,
+		JWTAccessSecret:   accessSecret,
+		JWTRefreshSecret:  refreshSecret,
+		JWTAccessTTL:      time.Duration(accessTTLMin) * time.Minute,
+		JWTRefreshTTL:     time.Duration(refreshTTLDays) * 24 * time.Hour,
+		OTPCodeLength:     otpCodeLength,
+		OTPCodeTTL:        time.Duration(otpCodeTTLMin) * time.Minute,
+		OTPResendCooldown: time.Duration(otpResendCooldownSec) * time.Second,
+		OTPRequestWindow:  time.Duration(otpWindowMin) * time.Minute,
+		OTPMaxPerWindow:   otpMaxPerWindow,
+		OTPMaxAttempts:    otpMaxAttempts,
+		OTPProvider:       getEnv("OTP_PROVIDER", ""),
+		OTPSMSTemplate:    getEnv("OTP_SMS_TEMPLATE", "Your Go Connect verification code is {code}. It expires in a few minutes."),
+
+		TwilioAccountSID:          os.Getenv("TWILIO_ACCOUNT_SID"),
+		TwilioAuthToken:           os.Getenv("TWILIO_AUTH_TOKEN"),
+		TwilioFromNumber:          os.Getenv("TWILIO_FROM_NUMBER"),
+		TwilioMessagingServiceSID: os.Getenv("TWILIO_MESSAGING_SERVICE_SID"),
+		RazorpayKeyID:             os.Getenv("RAZORPAY_KEY_ID"),
+		RazorpayKeySecret:         os.Getenv("RAZORPAY_KEY_SECRET"),
+		RazorpayWebhookSecret:     os.Getenv("RAZORPAY_WEBHOOK_SECRET"),
+		FCMProjectID:              os.Getenv("FCM_PROJECT_ID"),
+		FCMCredentialsJSON:        os.Getenv("FCM_CREDENTIALS_JSON"),
+		SMTPHost:                  os.Getenv("SMTP_HOST"),
+		SMTPPort:                  smtpPort,
+		SMTPUser:                  os.Getenv("SMTP_USER"),
+		SMTPPass:                  os.Getenv("SMTP_PASS"),
+		SMTPFrom:                  os.Getenv("SMTP_FROM"),
+		StorageProvider:           getEnv("STORAGE_PROVIDER", ""),
+		S3Bucket:                  os.Getenv("S3_BUCKET"),
+		S3Region:                  getEnv("S3_REGION", "us-east-1"),
+		S3AccessKey:               os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:               os.Getenv("S3_SECRET_KEY"),
+		S3Endpoint:                os.Getenv("S3_ENDPOINT"),
+		S3BaseURL:                 os.Getenv("S3_BASE_URL"),
 	}, nil
 }
 
@@ -197,4 +209,17 @@ func (c *Config) FCMEnabled() bool {
 // StorageEnabled reports whether S3 storage is configured.
 func (c *Config) StorageEnabled() bool {
 	return c.StorageProvider == "s3" && c.S3Bucket != "" && c.S3Region != ""
+}
+
+// TwilioEnabled reports whether Twilio SMS delivery is configured: an account
+// SID + auth token, plus either a from number or a messaging service SID.
+func (c *Config) TwilioEnabled() bool {
+	return c.TwilioAccountSID != "" && c.TwilioAuthToken != "" &&
+		(c.TwilioFromNumber != "" || c.TwilioMessagingServiceSID != "")
+}
+
+// EmailOTPEnabled reports whether the SMTP-based OTP email fallback can be used
+// (it reuses the configured SMTP sender).
+func (c *Config) EmailOTPEnabled() bool {
+	return c.SMTPHost != ""
 }
