@@ -2,7 +2,10 @@ package app
 
 import (
 	_ "embed"
+	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -39,10 +42,40 @@ func registerDocsRoutes(r chi.Router) {
 	})
 }
 
-func serveOpenAPISpec(w http.ResponseWriter, _ *http.Request) {
+// serversBlockRe matches the top-level "servers:" block (the "servers:" line
+// and the indented list items that follow it) up to the next top-level key.
+var serversBlockRe = regexp.MustCompile(`(?m)^servers:\n(?:[ \t-].*\n?)*`)
+
+// requestServerURL derives the API base URL (scheme://host/api/v1) from the
+// incoming request, honoring proxy-set forwarding headers used by Render,
+// Vercel, and other reverse proxies.
+func requestServerURL(r *http.Request) string {
+	scheme := "https"
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = strings.TrimSpace(strings.Split(proto, ",")[0])
+	} else if r.TLS == nil {
+		scheme = "http"
+	}
+
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Host
+	}
+	host = strings.TrimSpace(strings.Split(host, ",")[0])
+
+	return fmt.Sprintf("%s://%s/api/v1", scheme, host)
+}
+
+func serveOpenAPISpec(w http.ResponseWriter, r *http.Request) {
+	spec := openAPISpec
+	if host := requestServerURL(r); host != "" {
+		block := fmt.Sprintf("servers:\n- url: %s\n  description: Current host\n", host)
+		spec = serversBlockRe.ReplaceAll(spec, []byte(block))
+	}
+
 	w.Header().Set("Content-Type", "application/yaml")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(openAPISpec)
+	_, _ = w.Write(spec)
 }
 
 func serveSwaggerUI(w http.ResponseWriter, _ *http.Request) {
