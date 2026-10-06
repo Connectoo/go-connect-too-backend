@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -90,9 +91,43 @@ func NewServer(cfg *config.Config, log *slog.Logger, db Pinger, sqlDB *sql.DB) *
 		Pass: cfg.SMTPPass,
 		From: cfg.SMTPFrom,
 	})
+	// Select the OTP delivery transport by config. We always generate/verify the
+	// OTP ourselves; the sender is only a transport. Never log any secret here.
+	var otpSender auth.OTPSender
+	var otpProviderName string
+	switch strings.ToLower(strings.TrimSpace(cfg.OTPProvider)) {
+	case "twilio":
+		if cfg.TwilioEnabled() {
+			otpSender = auth.NewTwilioOTPSender(cfg.TwilioAccountSID, cfg.TwilioAuthToken, cfg.TwilioFromNumber, cfg.TwilioMessagingServiceSID, cfg.OTPSMSTemplate, nil, log)
+			otpProviderName = "twilio"
+		} else {
+			log.Warn("OTP_PROVIDER=twilio but Twilio is not configured; falling back to dev/noop")
+		}
+	case "email":
+		if cfg.EmailOTPEnabled() {
+			otpSender = auth.NewEmailOTPSender(emailSender, cfg.OTPSMSTemplate)
+			otpProviderName = "email"
+		} else {
+			log.Warn("OTP_PROVIDER=email but SMTP is not configured; falling back to dev/noop")
+		}
+	}
+	if otpSender == nil {
+		if cfg.AppEnv != "production" {
+			// Dev/test only: log the generated OTP code so the phone login/registration
+			// flow can be exercised without a real SMS provider. Never used in production.
+			otpSender = auth.NewLoggingOTPSender(log)
+			otpProviderName = "logging"
+		} else {
+			otpSender = auth.NoopOTPSender{}
+			otpProviderName = "noop"
+		}
+	}
+	log.Info("otp delivery provider selected", slog.String("provider", otpProviderName))
 	authSvc := auth.NewService(cfg, userRepo, registrar, authRepo, tokenManager,
 		auth.WithLifecycleStore(authRepo),
 		auth.WithEmailSender(emailSender),
+		auth.WithOTPStore(authRepo),
+		auth.WithOTPSender(otpSender),
 	)
 	authHandler := auth.NewHandler(authSvc, log)
 	userStatusUpdater := users.NewStatusUpdater(userRepo)

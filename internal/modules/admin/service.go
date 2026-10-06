@@ -122,11 +122,18 @@ func (s *Service) setUserStatus(ctx context.Context, userID uuid.UUID, status st
 	return &res, nil
 }
 
+func derefOr(p *string, fallback string) string {
+	if p == nil {
+		return fallback
+	}
+	return *p
+}
+
 func toUserResponse(user *users.User) UserResponse {
 	return UserResponse{
 		ID:        user.ID,
 		Name:      user.Name,
-		Email:     user.Email,
+		Email:     derefOr(user.Email, ""),
 		Phone:     user.Phone,
 		Role:      user.Role,
 		Status:    user.Status,

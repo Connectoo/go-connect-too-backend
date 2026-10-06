@@ -1,0 +1,18 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "Send-failure returns 500, not neutral 200",
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "description": "A Twilio or email delivery error propagates out of RequestOTP into writeServiceError's default case and surfaces as a generic 500 'Something went wrong', unlike the neutral 200 'If the phone is registered, an OTP was sent' returned on success in otpRequest. It does not reveal registration status, so it is not an enumeration leak and is non-blocking, but a transport outage is distinguishable from success. Optional: treat delivery failure as a logged-but-neutral 200 if callers must never distinguish the two cases."
+    },
+    {
+      "label": "Real secrets in working-tree .env (out of scope for this commit)",
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "description": "The untracked working-tree .env contains live Razorpay keys, a SendGrid SMTP API key, and a full Firebase private key. The Twilio fields in .env are correctly empty, and the base .env is minimal/deleted in the diff, so these secrets are pre-existing and NOT part of the Twilio commit (HEAD touches only the expected OTP/config/server/env.example/docs files). Flagged for awareness: rotate these secrets and keep them out of any future commit; not a blocker for this task."
+    }
+  ],
+  "reviewDoc": "/Users/mustafa/Desktop/projects/go-connect-too-backend/.agents/tasks/otp-twilio/review.md"
+}

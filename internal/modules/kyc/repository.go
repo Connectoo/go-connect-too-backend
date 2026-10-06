@@ -82,7 +82,7 @@ func (r *Repository) ListForAdmin(ctx context.Context, filter AdminListFilter) (
 	limitPos := len(args) + 1
 	offsetPos := len(args) + 2
 	query := `
-		SELECT` + recordColumns + `, ep.display_name, u.name, u.email
+		SELECT` + recordColumns + `, ep.display_name, u.name, COALESCE(u.email, '') AS email
 		FROM employee_kyc k
 		INNER JOIN employee_profiles ep ON ep.id = k.employee_id
 		INNER JOIN users u ON u.id = ep.user_id` + where + fmt.Sprintf(`
@@ -115,7 +115,7 @@ func (r *Repository) ListForAdmin(ctx context.Context, filter AdminListFilter) (
 // GetAdminByID returns a KYC record with employee and user metadata.
 func (r *Repository) GetAdminByID(ctx context.Context, id uuid.UUID) (*AdminListItem, error) {
 	query := `
-		SELECT` + recordColumns + `, ep.display_name, u.name, u.email
+		SELECT` + recordColumns + `, ep.display_name, u.name, COALESCE(u.email, '') AS email
 		FROM employee_kyc k
 		INNER JOIN employee_profiles ep ON ep.id = k.employee_id
 		INNER JOIN users u ON u.id = ep.user_id

@@ -3,9 +3,9 @@ package main
 import "github.com/google/uuid"
 
 const (
-	demoPassword           = "Demo123!"
-	demoEmailDomain        = "yopmail.com"
-	legacyDemoEmailDomain  = "demo.go-connect.local"
+	demoPassword          = "Demo123!"
+	demoEmailDomain       = "yopmail.com"
+	legacyDemoEmailDomain = "demo.go-connect.local"
 )
 
 // Catalog collects every seeded entity for Excel export.

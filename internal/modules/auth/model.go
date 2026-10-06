@@ -35,3 +35,15 @@ type EmailVerificationToken struct {
 	UsedAt    *time.Time
 	CreatedAt time.Time
 }
+
+// OTPLoginCode is a one-time phone login code (stored hashed).
+type OTPLoginCode struct {
+	ID           uuid.UUID
+	Phone        string
+	Role         string
+	CodeHash     string
+	ExpiresAt    time.Time
+	AttemptCount int
+	ConsumedAt   *time.Time
+	CreatedAt    time.Time
+}

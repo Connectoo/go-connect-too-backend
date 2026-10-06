@@ -12,6 +12,8 @@ import (
 	"github.com/MustafaKheda/go-connect-too-backend/internal/shared/pagination"
 )
 
+func strPtr(s string) *string { return &s }
+
 type mockStatsStore struct {
 	summary *DashboardSummary
 	err     error
@@ -65,7 +67,7 @@ func TestService_ListUsers_returnsPaginatedResult(t *testing.T) {
 		users: []users.User{{
 			ID:        userID,
 			Name:      "Jane",
-			Email:     "jane@example.com",
+			Email:     strPtr("jane@example.com"),
 			Role:      users.RoleCustomer,
 			Status:    users.StatusActive,
 			CreatedAt: time.Now().UTC(),

@@ -681,6 +681,56 @@ paths:
           $ref: '#/components/responses/UnauthorizedError'
         '500':
           $ref: '#/components/responses/InternalError'
+  /auth/otp/request:
+    post:
+      tags:
+      - Auth
+      summary: Request login OTP
+      operationId: requestOTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OTPRequestRequest'
+      responses:
+        '200':
+          description: OTP requested (neutral response; always 200 for a valid request)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/otp/verify:
+    post:
+      tags:
+      - Auth
+      summary: Verify login OTP
+      operationId: verifyOTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OTPVerifyRequest'
+      responses:
+        '200':
+          description: OTP verified; account auto-created if new, token pair issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /auth/resend-verification:
     post:
       tags:
@@ -2829,6 +2879,40 @@ components:
         password:
           type: string
           format: password
+    OTPRequestRequest:
+      type: object
+      required:
+      - phone
+      - role
+      properties:
+        phone:
+          type: string
+          example: '+15550100'
+        role:
+          type: string
+          enum:
+          - customer
+          - employee
+          example: customer
+    OTPVerifyRequest:
+      type: object
+      required:
+      - phone
+      - role
+      - code
+      properties:
+        phone:
+          type: string
+          example: '+15550100'
+        role:
+          type: string
+          enum:
+          - customer
+          - employee
+          example: customer
+        code:
+          type: string
+          example: '123456'
     RefreshRequest:
       type: object
       required:

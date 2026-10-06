@@ -266,11 +266,18 @@ func (s *Service) Deactivate(ctx context.Context, userID uuid.UUID) (*ProfileRes
 	return toProfileResponse(updated), nil
 }
 
+func derefOr(p *string, fallback string) string {
+	if p == nil {
+		return fallback
+	}
+	return *p
+}
+
 func toProfileResponse(user *User) *ProfileResponse {
 	return &ProfileResponse{
 		ID:        user.ID,
 		Name:      user.Name,
-		Email:     user.Email,
+		Email:     derefOr(user.Email, ""),
 		Phone:     user.Phone,
 		Role:      user.Role,
 		Status:    user.Status,

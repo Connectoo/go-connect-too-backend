@@ -45,7 +45,7 @@ func (r *Repository) ListAdmin(ctx context.Context, filter AdminListFilter) ([]A
 	limitPos := len(args) + 1
 	offsetPos := len(args) + 2
 	query := `
-		SELECT` + profileColumns + `, u.name, u.email, u.status
+		SELECT` + profileColumns + `, u.name, COALESCE(u.email, '') AS email, u.status
 		FROM employee_profiles ep
 		INNER JOIN users u ON u.id = ep.user_id` + where + fmt.Sprintf(`
 		ORDER BY ep.created_at DESC
@@ -77,7 +77,7 @@ func (r *Repository) ListAdmin(ctx context.Context, filter AdminListFilter) ([]A
 // GetAdminByID returns an employee profile with linked user account fields.
 func (r *Repository) GetAdminByID(ctx context.Context, id uuid.UUID) (*AdminListItem, error) {
 	query := `
-		SELECT` + profileColumns + `, u.name, u.email, u.status
+		SELECT` + profileColumns + `, u.name, COALESCE(u.email, '') AS email, u.status
 		FROM employee_profiles ep
 		INNER JOIN users u ON u.id = ep.user_id
 		WHERE ep.id = $1`

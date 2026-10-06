@@ -1,0 +1,18 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "Unregistered-phone request throttle gap",
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "detail": "/auth/otp/request only writes and counts rows in otp_login_codes for registered active users, so the resend-cooldown and max-per-window checks never fire for unknown phones; requests for non-existent numbers are unthrottled. Harmless with the shipped Noop sender (nothing is dispatched and registration status is not leaked), but an identity-independent throttle (per-IP or a request-attempt table keyed on phone regardless of user match) should be added before wiring a real SMS provider."
+    },
+    {
+      "label": "Non-constant-time hash comparison",
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "detail": "VerifyOTP compares the computed code hash to the stored hash with != rather than hmac.Equal/subtle.ConstantTimeCompare. This matches the pre-existing lifecycle-token convention in the module and the risk is low (keyed sha256, not a raw secret). Consistency note, not a blocker."
+    }
+  ],
+  "reviewDoc": "/Users/mustafa/Desktop/projects/go-connect-too-backend/.agents/tasks/otp-login/review.md"
+}

@@ -78,7 +78,7 @@ func (s *Service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest)
 
 	if s.mailer != nil && s.mailer.Enabled() {
 		body := fmt.Sprintf("Use this token to reset your password: %s\nIt expires in 30 minutes.", plain)
-		if err := s.mailer.Send(user.Email, "Password reset", body); err != nil {
+		if err := s.mailer.Send(derefOr(user.Email, ""), "Password reset", body); err != nil {
 			return fmt.Errorf("send password reset email: %w", err)
 		}
 	}
@@ -182,7 +182,7 @@ func (s *Service) ResendVerification(ctx context.Context, userID uuid.UUID) erro
 
 	if s.mailer != nil && s.mailer.Enabled() {
 		body := fmt.Sprintf("Verify your email with this token: %s\nIt expires in 24 hours.", plain)
-		if err := s.mailer.Send(user.Email, "Verify your email", body); err != nil {
+		if err := s.mailer.Send(derefOr(user.Email, ""), "Verify your email", body); err != nil {
 			return fmt.Errorf("send verification email: %w", err)
 		}
 	}
@@ -199,7 +199,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, req Chan
 	if err != nil {
 		return err
 	}
-	if err := security.CheckPassword(user.PasswordHash, req.CurrentPassword); err != nil {
+	if err := security.CheckPassword(derefOr(user.PasswordHash, ""), req.CurrentPassword); err != nil {
 		return ErrInvalidCredentials
 	}
 

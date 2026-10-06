@@ -20,6 +20,8 @@ func RegisterRoutes(r chi.Router, h *Handler, tokens *security.TokenManager) {
 		r.Post("/forgot-password", h.forgotPassword)
 		r.Post("/reset-password", h.resetPassword)
 		r.Post("/verify-email", h.verifyEmail)
+		r.Post("/otp/request", h.otpRequest)
+		r.Post("/otp/verify", h.otpVerify)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Authenticate(tokens))

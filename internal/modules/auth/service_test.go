@@ -13,34 +13,60 @@ import (
 )
 
 type mockUserStore struct {
-	users map[string]*users.User
-	byID  map[uuid.UUID]*users.User
+	users   map[string]*users.User
+	byID    map[uuid.UUID]*users.User
+	byPhone map[string]*users.User
 }
 
 func userStoreKey(email, role string) string {
 	return email + "\x00" + role
 }
 
+func phoneStoreKey(phone, role string) string {
+	return phone + "\x00" + role
+}
+
 func newMockUserStore() *mockUserStore {
 	return &mockUserStore{
-		users: make(map[string]*users.User),
-		byID:  make(map[uuid.UUID]*users.User),
+		users:   make(map[string]*users.User),
+		byID:    make(map[uuid.UUID]*users.User),
+		byPhone: make(map[string]*users.User),
 	}
 }
 
 func (m *mockUserStore) Create(_ context.Context, user *users.User) error {
-	key := userStoreKey(user.Email, user.Role)
-	if _, ok := m.users[key]; ok {
-		return users.ErrDuplicateEmail
-	}
 	copy := *user
-	m.users[key] = &copy
+	// Phone-only accounts (nil email) are keyed by phone so multiple of them can
+	// coexist; email/password accounts are keyed by email+role.
+	if user.Email != nil {
+		key := userStoreKey(*user.Email, user.Role)
+		if _, ok := m.users[key]; ok {
+			return users.ErrDuplicateEmail
+		}
+		m.users[key] = &copy
+	}
+	if copy.Phone != nil {
+		phoneKey := phoneStoreKey(*copy.Phone, copy.Role)
+		if _, ok := m.byPhone[phoneKey]; ok {
+			return users.ErrDuplicatePhone
+		}
+		m.byPhone[phoneKey] = &copy
+	}
 	m.byID[user.ID] = &copy
 	return nil
 }
 
 func (m *mockUserStore) GetByEmailAndRole(_ context.Context, email, role string) (*users.User, error) {
 	user, ok := m.users[userStoreKey(email, role)]
+	if !ok {
+		return nil, users.ErrNotFound
+	}
+	copy := *user
+	return &copy, nil
+}
+
+func (m *mockUserStore) GetByPhoneAndRole(_ context.Context, phone, role string) (*users.User, error) {
+	user, ok := m.byPhone[phoneStoreKey(phone, role)]
 	if !ok {
 		return nil, users.ErrNotFound
 	}
@@ -95,6 +121,13 @@ func testConfig() *config.Config {
 		JWTRefreshSecret: "test-refresh-secret-min-32-characters",
 		JWTAccessTTL:     15 * time.Minute,
 		JWTRefreshTTL:    7 * 24 * time.Hour,
+
+		OTPCodeLength:     6,
+		OTPCodeTTL:        5 * time.Minute,
+		OTPResendCooldown: 60 * time.Second,
+		OTPRequestWindow:  15 * time.Minute,
+		OTPMaxPerWindow:   5,
+		OTPMaxAttempts:    5,
 	}
 }
 
@@ -228,6 +261,38 @@ func TestLoginWrongPassword(t *testing.T) {
 	_, err = svc.LoginCustomer(context.Background(), LoginRequest{
 		Email:    "john2@example.com",
 		Password: "wrong-password",
+	})
+	if err != ErrInvalidCredentials {
+		t.Fatalf("error = %v, want %v", err, ErrInvalidCredentials)
+	}
+}
+
+func TestPasswordLoginRejectsPhoneOnlyAccount(t *testing.T) {
+	store := newMockUserStore()
+	svc := newTestService(t, store, newMockRefreshStore())
+
+	// Seed a phone-only account directly: no email, no password hash.
+	phone := "+15551230000"
+	email := "phoneonly@example.com"
+	id := uuid.New()
+	seeded := &users.User{
+		ID:           id,
+		Name:         "",
+		Email:        nil,
+		Phone:        &phone,
+		PasswordHash: nil,
+		Role:         users.RoleCustomer,
+		Status:       users.StatusActive,
+	}
+	// Index by an email key so login's GetByEmailAndRole can find it; the point is
+	// that even when found, a nil password hash must fail cleanly (not panic/500).
+	store.users[userStoreKey(email, users.RoleCustomer)] = seeded
+	store.byID[id] = seeded
+	store.byPhone[phoneStoreKey(phone, users.RoleCustomer)] = seeded
+
+	_, err := svc.LoginCustomer(context.Background(), LoginRequest{
+		Email:    email,
+		Password: "any-password",
 	})
 	if err != ErrInvalidCredentials {
 		t.Fatalf("error = %v, want %v", err, ErrInvalidCredentials)
